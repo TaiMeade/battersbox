@@ -1,9 +1,7 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
-import { File, Paths } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import * as Sharing from 'expo-sharing';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
@@ -21,7 +19,6 @@ import {
   useWindowDimensions,
   type TextInputProps,
 } from 'react-native';
-import { captureRef } from 'react-native-view-shot';
 
 import { BigButton } from '@/components/BigButton';
 import {
@@ -45,6 +42,7 @@ import {
   setCardDetail,
   type CardDetailKey,
 } from '@/lib/cardProfile';
+import { shareViewImage } from '@/lib/shareImage';
 import { fonts, radius, spacing } from '@/theme/tokens';
 import { useTheme } from '@/theme/useTheme';
 
@@ -163,11 +161,7 @@ export default function CardScreen() {
     if (busy) return;
     setBusy(true);
     try {
-      const shot = await captureRef(shotRef, { format: 'png', quality: 1 });
-      const file = new File(Paths.cache, `battersbox-card-${side}.png`);
-      if (file.exists) file.delete();
-      new File(shot).copy(file);
-      await Sharing.shareAsync(file.uri, { mimeType: 'image/png', dialogTitle: 'BattersBox card' });
+      await shareViewImage(shotRef, `battersbox-card-${side}.png`);
     } catch (e) {
       Alert.alert('Couldn’t share the card', e instanceof Error ? e.message : String(e));
     } finally {

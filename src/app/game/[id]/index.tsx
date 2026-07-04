@@ -4,10 +4,11 @@ import { asc, eq } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import { BigButton } from '@/components/BigButton';
+import { MilestoneBanner } from '@/components/MilestoneBanner';
 import { OutcomeGrid } from '@/components/OutcomeGrid';
 import { Screen } from '@/components/Screen';
 import { ScoreboardPanel } from '@/components/ScoreboardPanel';
@@ -17,8 +18,10 @@ import { UndoSnackbar } from '@/components/UndoSnackbar';
 import { db } from '@/db/client';
 import { endGame, logPA, setGameOpponent, setPASpray } from '@/db/repo';
 import { games, plateAppearances } from '@/db/schema';
+import type { Milestone } from '@/domain/milestones';
 import { OUTCOME_SPECS, isOutcomeCode, type OutcomeCode } from '@/domain/outcomes';
 import { gameLine } from '@/domain/stats';
+import { milestoneAfterPA } from '@/lib/checkMilestones';
 import { formatDate } from '@/lib/format';
 import { useUndoStore } from '@/store/undo';
 import { fonts, spacing } from '@/theme/tokens';
@@ -56,6 +59,9 @@ export default function LiveGame() {
 
   const [opponent, setOpponent] = useState('');
   const [sprayFor, setSprayFor] = useState<{ paId: string; outcome: OutcomeCode } | null>(null);
+  const [celebration, setCelebration] = useState<Milestone | null>(null);
+  // A milestone earned on a ball in play waits for the spray prompt to close.
+  const pendingMilestone = useRef<Milestone | null>(null);
   useEffect(() => {
     if (game) setOpponent(game.opponent ?? '');
     // Re-sync only when a different game is opened, not on every live update.
@@ -77,12 +83,15 @@ export default function LiveGame() {
   const onOutcome = async (code: OutcomeCode) => {
     const pa = await logPA(game.id, code);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const milestone = await milestoneAfterPA(game.seasonId, game.id);
     if (OUTCOME_SPECS[code].inPlay) {
       // Ball in play — offer the optional spray-chart tap. The undo toast
       // waits until this closes so its 4s window isn't spent aiming.
       setSprayFor({ paId: pa.id, outcome: code });
+      pendingMilestone.current = milestone;
     } else {
       showUndo({ paId: pa.id, label: `Logged: ${OUTCOME_SPECS[code].name}` });
+      if (milestone) setCelebration(milestone);
     }
   };
 
@@ -91,6 +100,10 @@ export default function LiveGame() {
     if (place) void setPASpray(sprayFor.paId, place.x, place.y);
     showUndo({ paId: sprayFor.paId, label: `Logged: ${OUTCOME_SPECS[sprayFor.outcome].name}` });
     setSprayFor(null);
+    if (pendingMilestone.current) {
+      setCelebration(pendingMilestone.current);
+      pendingMilestone.current = null;
+    }
   };
 
   const onEndGame = async () => {
@@ -174,6 +187,8 @@ export default function LiveGame() {
       />
 
       <UndoSnackbar />
+
+      <MilestoneBanner milestone={celebration} onDismiss={() => setCelebration(null)} />
     </Screen>
   );
 }

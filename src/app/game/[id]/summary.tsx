@@ -2,7 +2,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { asc, eq } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Modal,
@@ -17,13 +17,15 @@ import { BigButton } from '@/components/BigButton';
 import { OutcomeGrid } from '@/components/OutcomeGrid';
 import { Screen } from '@/components/Screen';
 import { ScoreboardPanel, ScoreStat, ScoreStatRow } from '@/components/ScoreboardPanel';
+import { GameShareCard } from '@/components/share/ShareCards';
 import { Body, Display, Eyebrow, Mono } from '@/components/typography';
 import { db } from '@/db/client';
 import { deleteGame, reopenGame, undoPA, updatePAOutcome } from '@/db/repo';
-import { games, plateAppearances, type PlateAppearance } from '@/db/schema';
+import { games, plateAppearances, players, type PlateAppearance } from '@/db/schema';
 import { OUTCOME_SPECS, isOutcomeCode } from '@/domain/outcomes';
 import { computeLine, gameLine } from '@/domain/stats';
 import { formatDate, gameTitle } from '@/lib/format';
+import { shareViewImage } from '@/lib/shareImage';
 import { fonts, radius, spacing } from '@/theme/tokens';
 import { useTheme } from '@/theme/useTheme';
 
@@ -47,12 +49,22 @@ export default function GameSummary() {
     [id],
   );
 
+  const { data: playerRows } = useLiveQuery(db.select().from(players).limit(1));
+  const playerName = playerRows?.[0]?.name.trim() || 'Me';
+
   const game = gameRows?.[0];
   const outcomes = useMemo(
     () => (paRows ?? []).map((pa) => pa.outcome).filter(isOutcomeCode),
     [paRows],
   );
   const line = useMemo(() => computeLine(outcomes), [outcomes]);
+
+  const shotRef = useRef<View>(null);
+  const onShare = () => {
+    void shareViewImage(shotRef, 'battersbox-game.png').catch(() =>
+      Alert.alert('Couldn’t share', 'Try again in a moment.'),
+    );
+  };
 
   if (!game) return <Screen>{null}</Screen>;
   const open = game.endedAt === null;
@@ -96,7 +108,19 @@ export default function GameSummary() {
             {formatDate(game.playedOn)}
           </Body>
         </View>
-        <View style={{ width: 32 }} />
+        {outcomes.length > 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Share this game as an image"
+            onPress={onShare}
+            hitSlop={12}
+            style={{ width: 32, alignItems: 'center' }}
+          >
+            <MaterialCommunityIcons name="share-variant" size={24} color={colors.text} />
+          </Pressable>
+        ) : (
+          <View style={{ width: 32 }} />
+        )}
       </View>
 
       <ScrollView
@@ -145,6 +169,13 @@ export default function GameSummary() {
       </ScrollView>
 
       <EditPAModal pa={editing} onClose={() => setEditing(null)} />
+
+      {/* Off-screen share image — captured by the header share button. */}
+      {outcomes.length > 0 && (
+        <View ref={shotRef} collapsable={false} pointerEvents="none" style={styles.shot}>
+          <GameShareCard width={330} game={game} outcomes={outcomes} playerName={playerName} />
+        </View>
+      )}
     </Screen>
   );
 }
@@ -246,6 +277,12 @@ const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  shot: {
+    position: 'absolute',
+    top: 0,
+    left: -9999,
+    width: 330,
   },
   sheet: {
     maxHeight: '82%',
