@@ -7,8 +7,9 @@ import { Chips } from '@/components/Chips';
 import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
 import { ScoreboardPanel, ScoreStat, ScoreStatRow } from '@/components/ScoreboardPanel';
+import { SprayField, SprayLegend, type SprayPoint } from '@/components/spray/SprayField';
 import { Body, Display, Eyebrow } from '@/components/typography';
-import type { OutcomeCode } from '@/domain/outcomes';
+import { OUTCOME_SPECS, type OutcomeCode } from '@/domain/outcomes';
 import { computeLine, formatAvg, formatRate } from '@/domain/stats';
 import {
   groupOutcomesByGame,
@@ -59,6 +60,23 @@ export default function Trends() {
     }
     return points;
   }, [seasonGames, seasonPARows]);
+
+  // Located batted balls for the season spray chart.
+  const sprayPoints = useMemo<SprayPoint[]>(() => {
+    const pts: SprayPoint[] = [];
+    for (const r of seasonPARows ?? []) {
+      if (r.sprayX === null || r.sprayY === null) continue;
+      const group = OUTCOME_SPECS[r.outcome].group;
+      if (group === 'onBase') continue;
+      pts.push({ x: r.sprayX, y: r.sprayY, group });
+    }
+    return pts;
+  }, [seasonPARows]);
+
+  const ballsInPlay = useMemo(
+    () => (seasonPARows ?? []).filter((r) => OUTCOME_SPECS[r.outcome].inPlay).length,
+    [seasonPARows],
+  );
 
   return (
     <Screen>
@@ -128,6 +146,20 @@ export default function Trends() {
             <Eyebrow>Outcome mix</Eyebrow>
             <OutcomeMixBars line={line} />
           </View>
+
+          {scope === 'season' && sprayPoints.length > 0 && (
+            <View style={{ gap: spacing.m }}>
+              <Eyebrow>Spray chart</Eyebrow>
+              <SprayField points={sprayPoints} />
+              <SprayLegend points={sprayPoints} />
+              {sprayPoints.length < ballsInPlay && (
+                <Body size={13} color={colors.textSoft}>
+                  {sprayPoints.length} of {ballsInPlay} balls in play have a location — tap the
+                  field when you log one to fill this in.
+                </Body>
+              )}
+            </View>
+          )}
         </ScrollView>
       )}
     </Screen>

@@ -14,7 +14,7 @@ import {
   type Season,
   type Sport,
 } from './schema';
-import type { OutcomeCode } from '@/domain/outcomes';
+import { OUTCOME_SPECS, type OutcomeCode } from '@/domain/outcomes';
 
 const now = () => Date.now();
 
@@ -163,7 +163,21 @@ export async function undoPA(paId: string): Promise<void> {
 }
 
 export async function updatePAOutcome(paId: string, outcome: OutcomeCode): Promise<void> {
-  await db.update(plateAppearances).set({ outcome }).where(eq(plateAppearances.id, paId));
+  // A location only makes sense for a batted ball — drop it if the
+  // corrected outcome never put one in play (e.g. 2B edited to K).
+  const spray = OUTCOME_SPECS[outcome].inPlay ? {} : { sprayX: null, sprayY: null };
+  await db
+    .update(plateAppearances)
+    .set({ outcome, ...spray })
+    .where(eq(plateAppearances.id, paId));
+}
+
+/** Batted-ball location, normalized to the field diagram (0..1 of width/height). */
+export async function setPASpray(paId: string, x: number, y: number): Promise<void> {
+  await db
+    .update(plateAppearances)
+    .set({ sprayX: x, sprayY: y })
+    .where(eq(plateAppearances.id, paId));
 }
 
 export async function listPAsForGame(gameId: string): Promise<PlateAppearance[]> {

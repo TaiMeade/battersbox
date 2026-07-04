@@ -11,10 +11,11 @@ import { BigButton } from '@/components/BigButton';
 import { OutcomeGrid } from '@/components/OutcomeGrid';
 import { Screen } from '@/components/Screen';
 import { ScoreboardPanel } from '@/components/ScoreboardPanel';
+import { SprayCapture } from '@/components/spray/SprayCapture';
 import { Body, Eyebrow, Mono } from '@/components/typography';
 import { UndoSnackbar } from '@/components/UndoSnackbar';
 import { db } from '@/db/client';
-import { endGame, logPA, setGameOpponent } from '@/db/repo';
+import { endGame, logPA, setGameOpponent, setPASpray } from '@/db/repo';
 import { games, plateAppearances } from '@/db/schema';
 import { OUTCOME_SPECS, isOutcomeCode, type OutcomeCode } from '@/domain/outcomes';
 import { gameLine } from '@/domain/stats';
@@ -54,6 +55,7 @@ export default function LiveGame() {
   );
 
   const [opponent, setOpponent] = useState('');
+  const [sprayFor, setSprayFor] = useState<{ paId: string; outcome: OutcomeCode } | null>(null);
   useEffect(() => {
     if (game) setOpponent(game.opponent ?? '');
     // Re-sync only when a different game is opened, not on every live update.
@@ -75,7 +77,20 @@ export default function LiveGame() {
   const onOutcome = async (code: OutcomeCode) => {
     const pa = await logPA(game.id, code);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    showUndo({ paId: pa.id, label: `Logged: ${OUTCOME_SPECS[code].name}` });
+    if (OUTCOME_SPECS[code].inPlay) {
+      // Ball in play — offer the optional spray-chart tap. The undo toast
+      // waits until this closes so its 4s window isn't spent aiming.
+      setSprayFor({ paId: pa.id, outcome: code });
+    } else {
+      showUndo({ paId: pa.id, label: `Logged: ${OUTCOME_SPECS[code].name}` });
+    }
+  };
+
+  const finishSpray = (place?: { x: number; y: number }) => {
+    if (!sprayFor) return;
+    if (place) void setPASpray(sprayFor.paId, place.x, place.y);
+    showUndo({ paId: sprayFor.paId, label: `Logged: ${OUTCOME_SPECS[sprayFor.outcome].name}` });
+    setSprayFor(null);
   };
 
   const onEndGame = async () => {
@@ -151,6 +166,12 @@ export default function LiveGame() {
       <View style={{ paddingBottom: spacing.l }}>
         <BigButton label="End game" variant="secondary" onPress={() => void onEndGame()} />
       </View>
+
+      <SprayCapture
+        outcome={sprayFor?.outcome ?? null}
+        onPlace={(x, y) => finishSpray({ x, y })}
+        onSkip={() => finishSpray()}
+      />
 
       <UndoSnackbar />
     </Screen>

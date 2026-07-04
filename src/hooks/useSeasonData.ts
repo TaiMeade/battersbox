@@ -39,13 +39,20 @@ export function useSeasonGames(seasonId: string | undefined): Game[] | undefined
 export interface SeasonPARow {
   gameId: string;
   outcome: OutcomeCode;
+  sprayX: number | null;
+  sprayY: number | null;
 }
 
 /** Every PA in a season (joined through games), for stats + grouping. */
 export function useSeasonPAs(seasonId: string | undefined): SeasonPARow[] | undefined {
   const { data, updatedAt } = useLiveQuery(
     db
-      .select({ gameId: plateAppearances.gameId, outcome: plateAppearances.outcome })
+      .select({
+        gameId: plateAppearances.gameId,
+        outcome: plateAppearances.outcome,
+        sprayX: plateAppearances.sprayX,
+        sprayY: plateAppearances.sprayY,
+      })
       .from(plateAppearances)
       .innerJoin(games, eq(plateAppearances.gameId, games.id))
       .where(eq(games.seasonId, seasonId ?? ''))

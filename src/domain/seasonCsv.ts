@@ -1,5 +1,5 @@
 import { OUTCOME_SPECS, isOutcomeCode, type OutcomeCode } from './outcomes';
-import { computeLine, formatAvg } from './stats';
+import { computeLine } from './stats';
 
 /** One plate appearance as it comes out of the export query. */
 export interface SeasonCsvRow {
@@ -13,9 +13,9 @@ function esc(value: string): string {
   return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }
 
-/** Rate stat for a CSV cell: '.412' / '1.000', or empty when undefined. */
+/** Rate stat for a CSV cell: always three decimals ('0.412', '1.000'), empty when undefined. */
 function rate(value: number | null): string {
-  return value === null ? '' : formatAvg(value);
+  return value === null ? '' : value.toFixed(3);
 }
 
 /**
@@ -25,7 +25,7 @@ function rate(value: number | null): string {
  */
 export function buildSeasonCSV(seasonName: string, rows: SeasonCsvRow[]): string {
   const lines = [
-    'date,opponent,at_bat,outcome,outcome_name,pa,ab,h,avg,obp,slg,ops',
+    'Date,Opponent,At Bat,Outcome,Outcome Name,PA,AB,H,AVG,OBP,SLG,OPS',
   ];
 
   const running: OutcomeCode[] = [];
@@ -52,7 +52,7 @@ export function buildSeasonCSV(seasonName: string, rows: SeasonCsvRow[]): string
 
   const totals = computeLine(running);
 
-  lines.push('', 'season,pa,ab,h,tb,avg,obp,slg,ops');
+  lines.push('', 'Season,PA,AB,H,TB,AVG,OBP,SLG,OPS');
   lines.push(
     [
       esc(seasonName),
@@ -67,7 +67,7 @@ export function buildSeasonCSV(seasonName: string, rows: SeasonCsvRow[]): string
     ].join(','),
   );
 
-  lines.push('', 'outcome,outcome_name,count');
+  lines.push('', 'Outcome,Outcome Name,Count');
   for (const code of Object.keys(OUTCOME_SPECS) as OutcomeCode[]) {
     const count = totals.counts[code] ?? 0;
     if (count > 0) lines.push([code, esc(OUTCOME_SPECS[code].name), String(count)].join(','));

@@ -32,6 +32,8 @@ export interface OutcomeSpec {
   /** Full name, used in hints and the PA log. */
   name: string;
   group: OutcomeGroup;
+  /** Ball was put in play — these offer the spray-chart location prompt. */
+  inPlay: boolean;
   /** Counts as an at-bat. */
   ab: boolean;
   /** Counts as a hit. */
@@ -46,23 +48,24 @@ export interface OutcomeSpec {
 }
 
 export const OUTCOME_SPECS: Record<OutcomeCode, OutcomeSpec> = {
-  '1B': { code: '1B', name: 'Single', group: 'hit', ab: true, hit: true, totalBases: 1, obpNum: true, obpDen: true },
-  '2B': { code: '2B', name: 'Double', group: 'hit', ab: true, hit: true, totalBases: 2, obpNum: true, obpDen: true },
-  '3B': { code: '3B', name: 'Triple', group: 'hit', ab: true, hit: true, totalBases: 3, obpNum: true, obpDen: true },
-  HR: { code: 'HR', name: 'Home Run', group: 'hit', ab: true, hit: true, totalBases: 4, obpNum: true, obpDen: true },
-  BB: { code: 'BB', name: 'Walk', group: 'onBase', ab: false, hit: false, totalBases: 0, obpNum: true, obpDen: true },
+  '1B': { code: '1B', name: 'Single', group: 'hit', inPlay: true, ab: true, hit: true, totalBases: 1, obpNum: true, obpDen: true },
+  '2B': { code: '2B', name: 'Double', group: 'hit', inPlay: true, ab: true, hit: true, totalBases: 2, obpNum: true, obpDen: true },
+  '3B': { code: '3B', name: 'Triple', group: 'hit', inPlay: true, ab: true, hit: true, totalBases: 3, obpNum: true, obpDen: true },
+  HR: { code: 'HR', name: 'Home Run', group: 'hit', inPlay: true, ab: true, hit: true, totalBases: 4, obpNum: true, obpDen: true },
+  BB: { code: 'BB', name: 'Walk', group: 'onBase', inPlay: false, ab: false, hit: false, totalBases: 0, obpNum: true, obpDen: true },
   HBP: {
-    code: 'HBP', name: 'Hit by Pitch', group: 'onBase', ab: false, hit: false, totalBases: 0, obpNum: true, obpDen: true,
+    code: 'HBP', name: 'Hit by Pitch', group: 'onBase', inPlay: false, ab: false, hit: false, totalBases: 0, obpNum: true, obpDen: true,
   },
-  K: { code: 'K', name: 'Strikeout', group: 'out', ab: true, hit: false, totalBases: 0, obpNum: false, obpDen: true },
-  GO: { code: 'GO', name: 'Groundout', group: 'out', ab: true, hit: false, totalBases: 0, obpNum: false, obpDen: true },
+  K: { code: 'K', name: 'Strikeout', group: 'out', inPlay: false, ab: true, hit: false, totalBases: 0, obpNum: false, obpDen: true },
+  GO: { code: 'GO', name: 'Groundout', group: 'out', inPlay: true, ab: true, hit: false, totalBases: 0, obpNum: false, obpDen: true },
   FO: {
-    code: 'FO', name: 'Flyout / Lineout', group: 'out', ab: true, hit: false, totalBases: 0, obpNum: false, obpDen: true,
+    code: 'FO', name: 'Flyout / Lineout', group: 'out', inPlay: true, ab: true, hit: false, totalBases: 0, obpNum: false, obpDen: true,
   },
   FC: {
     code: 'FC',
     name: "Fielder's Choice",
     group: 'out',
+    inPlay: true,
     ab: true,
     hit: false,
     totalBases: 0,
@@ -74,6 +77,7 @@ export const OUTCOME_SPECS: Record<OutcomeCode, OutcomeSpec> = {
     code: 'E',
     name: 'Reached on Error',
     group: 'out',
+    inPlay: true,
     ab: true,
     hit: false,
     totalBases: 0,
@@ -85,6 +89,7 @@ export const OUTCOME_SPECS: Record<OutcomeCode, OutcomeSpec> = {
     code: 'SF',
     name: 'Sac Fly',
     group: 'sacrifice',
+    inPlay: true,
     ab: false,
     hit: false,
     totalBases: 0,
@@ -96,6 +101,7 @@ export const OUTCOME_SPECS: Record<OutcomeCode, OutcomeSpec> = {
     code: 'SAC',
     name: 'Sac Bunt',
     group: 'sacrifice',
+    inPlay: true,
     ab: false,
     hit: false,
     totalBases: 0,
