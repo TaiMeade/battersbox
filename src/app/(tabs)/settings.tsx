@@ -1,5 +1,6 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Constants from 'expo-constants';
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
@@ -33,6 +34,7 @@ const SPORT_OPTIONS: { key: Sport; label: string }[] = [
 
 export default function Settings() {
   const { colors } = useTheme();
+  const router = useRouter();
   const { season: activeSeason } = useActiveSeason();
   const seasons = useSeasons();
   const { data: playerRows } = useLiveQuery(db.select().from(players).limit(1));
@@ -140,6 +142,12 @@ export default function Settings() {
         </Section>
 
         <Section title="Your data">
+          <DataRow
+            icon="card-account-details-outline"
+            label="Baseball card"
+            description="Front and back, printed from your stats"
+            onPress={() => router.push('/card')}
+          />
           <DataRow
             icon="table-arrow-right"
             label="Export season CSV"

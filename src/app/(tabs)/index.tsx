@@ -1,7 +1,8 @@
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { eq } from 'drizzle-orm';
 import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { BigButton } from '@/components/BigButton';
 import { EmptyState } from '@/components/EmptyState';
@@ -89,7 +90,21 @@ function DashboardBody({ season }: { season: Season }) {
         }}
       >
         <Display size={32}>Batter&apos;s Box</Display>
-        <Text style={{ fontSize: 24 }}>{season.sport === 'softball' ? '🥎' : '⚾'}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.l }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Your baseball card"
+            hitSlop={8}
+            onPress={() => router.push('/card')}
+          >
+            <MaterialCommunityIcons
+              name="card-account-details-outline"
+              size={24}
+              color={colors.textSoft}
+            />
+          </Pressable>
+          <Text style={{ fontSize: 24 }}>{season.sport === 'softball' ? '🥎' : '⚾'}</Text>
+        </View>
       </View>
 
       <ScrollView
