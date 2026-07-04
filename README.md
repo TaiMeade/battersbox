@@ -1,56 +1,110 @@
-# Welcome to your Expo app 👋
+# ⚾ BattersBox
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A dead-simple baseball & softball hitting tracker. Tap the outcome of each
+at-bat — the app keeps your running AVG / OBP / SLG / OPS across games and
+seasons. Fully offline: everything lives in a local SQLite database on the
+phone. No account, no cloud, no signal needed in the bleachers.
 
-## Get started
+**v1 = Player Mode only** (one player, your own log). The schema is
+future-proofed for Scorekeeper Mode: a `players` table exists from day one and
+plate appearances reserve spray-chart coordinates.
 
-1. Install dependencies
+## Stack
 
-   ```bash
-   npm install
-   ```
+| Layer | Choice |
+|---|---|
+| Framework | React Native + **Expo SDK 54** (Expo Router, TypeScript strict) — pinned to 54 because the user's iPhone runs the last Expo Go its iOS version supports |
+| Database | **expo-sqlite + Drizzle ORM** — typed schema, versioned migrations, `useLiveQuery` reactivity |
+| State | DB is the source of truth; Zustand only for the undo toast |
+| Charts | react-native-svg, hand-rolled (palette validated for CVD + contrast in both themes) |
+| Tests | Vitest on the pure-TS stats engine (`src/domain`) |
 
-2. Start the app
+## Requirements
 
-   ```bash
-   npx expo start
-   ```
+- **Node ≥ 20.19 (Node 22 LTS installed via nvm — `nvm use 22.23.1`)**.
+  React Native 0.86 refuses older Nodes.
+- npm (comes with Node)
+- For iPhone testing: the free **Expo Go** app from the App Store
 
-In the output, you'll find options to open the app in a
+## Run it
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```powershell
+cd C:\Users\Tai Meade\PersonalDevelopment\battersbox
+npm install
+npx expo start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### Test on your iPhone (no Mac, no Apple Developer account)
 
-### Other setup steps
+1. Install **Expo Go** from the App Store on the iPhone.
+2. Make sure the iPhone and this PC are on the **same Wi-Fi network**.
+3. Run `npx expo start` in the project folder.
+4. Open the iPhone **Camera** app and scan the QR code in the terminal —
+   tap the banner and it opens in Expo Go.
+5. Changes hot-reload as you save files.
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+> Firewall note: the first run may pop a Windows Defender prompt for Node —
+> allow it on **private networks**, or the phone can't reach Metro.
+> If the connection still fails (some routers isolate devices), run
+> `npx expo start --tunnel` instead — it routes over the internet and always works.
 
-## Learn more
+### Test on Android
 
-To learn more about developing your project with Expo, look at the following resources:
+Same flow with Expo Go from the Play Store, or press `a` in the Metro terminal
+if an emulator is running.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Scripts
 
-## Join the community
+```powershell
+npm test            # stats-engine golden tests (vitest)
+npm run typecheck   # tsc --noEmit
+npm run db:generate # regenerate drizzle migrations after editing src/db/schema.ts
+```
 
-Join our community of developers creating universal apps.
+## Project layout
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```
+src/
+  app/                  # Expo Router screens
+    (tabs)/             # Dashboard · Games · Trends · Settings
+    game/[id]/          # live logging screen + game summary
+    onboarding.tsx      # first-run: sport, season, name
+  db/                   # Drizzle schema, client, repositories
+  domain/               # outcome taxonomy + stats engine (pure TS, tested)
+  components/           # design system (Scoreboard & Chalk)
+  theme/                # tokens: palette, type, per-theme colors
+  hooks/ lib/ store/
+drizzle/                # generated SQL migrations (bundled into the app)
+```
+
+## Design system — "Scoreboard & Chalk"
+
+- The **scoreboard panel** (monster green + amber mono numerals) is the
+  signature; it stays green in light *and* dark mode.
+- Light mode is foul-line chalk (paper beats glass in sunlight — the tap
+  surfaces stay light with dark text); dark mode is deep night-green.
+- Outcome tiles are grouped by scoring meaning: **Hits** (grass) ·
+  **On base** (amber) · **Outs** (clay) · **Sacrifice** (bunting blue).
+  Long-press FC / E / SF / SAC tiles for plain-language scoring rules.
+- Type: Barlow Condensed (display) · Barlow (body) · IBM Plex Mono (all stat
+  numerals, tabular).
+
+## Scoring defaults baked in
+
+- FC and reached-on-error: at-bat, no hit, no OBP credit (official scoring).
+- Sac **fly** counts against OBP; sac **bunt** doesn't.
+- Zero denominators render as `—`, never NaN.
+
+## Shipping to TestFlight later (still no Mac needed)
+
+1. Create a free account at expo.dev, then `npm i -g eas-cli && eas login`.
+2. `eas build:configure`
+3. Enroll in the Apple Developer Program ($99/yr — takes a few days).
+4. `eas build --platform ios --profile production` (cloud build, EAS manages
+   certificates) then `eas submit -p ios`.
+
+## Not in v1 (deliberately)
+
+Spray chart (schema ready: `spray_x/y`) → Pro paywall → Scorekeeper Mode
+(lineups/innings around the same PA table) → optional cloud sync. Custom app
+icon/splash still TODO before any store submission.
