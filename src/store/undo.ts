@@ -1,10 +1,9 @@
 import { create } from 'zustand';
 
-import { undoPA } from '@/db/repo';
-
 interface UndoToast {
-  paId: string;
   label: string;
+  /** What "Undo" actually does — the caller owns the delete. */
+  onUndo: () => void | Promise<void>;
 }
 
 interface UndoState {
@@ -32,6 +31,6 @@ export const useUndoStore = create<UndoState>((set, get) => ({
     const current = get().toast;
     if (!current) return;
     get().clear();
-    await undoPA(current.paId);
+    await current.onUndo();
   },
 }));

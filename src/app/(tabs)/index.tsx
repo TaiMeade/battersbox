@@ -12,6 +12,7 @@ import { ScoreboardPanel, ScoreStat, ScoreStatRow } from '@/components/Scoreboar
 import { Display, Eyebrow, Mono } from '@/components/typography';
 import { db } from '@/db/client';
 import { getOpenGame, startGame } from '@/db/repo';
+import { getAppMode, setAppMode } from '@/db/skRepo';
 import { seasons, type Season } from '@/db/schema';
 import { computeLine, formatAvg } from '@/domain/stats';
 import {
@@ -22,34 +23,41 @@ import {
 import { spacing } from '@/theme/tokens';
 import { useTheme } from '@/theme/useTheme';
 
+type Gate = 'loading' | 'sk' | 'onboarding' | { season: Season };
+
 export default function Dashboard() {
-  // Redirect decision comes from a fresh read on every focus — a live query
+  // Redirect decisions come from a fresh read on every focus — a live query
   // can lag one render behind right after onboarding creates the season,
-  // which would bounce the user straight back to onboarding.
-  const [season, setSeason] = useState<Season | null | undefined>(undefined);
+  // which would bounce the user straight back to onboarding. The app.mode
+  // check runs first: Expo Router always cold-starts at "/", so this gate
+  // is also what restores Scorekeeper Mode after a relaunch.
+  const [gate, setGate] = useState<Gate>('loading');
 
   useFocusEffect(
     useCallback(() => {
       let alive = true;
-      db.select()
-        .from(seasons)
-        .where(eq(seasons.isActive, true))
-        .limit(1)
-        .then((rows) => {
-          if (alive) setSeason(rows[0] ?? null);
-        })
-        .catch(() => {
-          if (alive) setSeason(null);
-        });
+      void (async () => {
+        try {
+          if ((await getAppMode()) === 'scorekeeper') {
+            if (alive) setGate('sk');
+            return;
+          }
+          const rows = await db.select().from(seasons).where(eq(seasons.isActive, true)).limit(1);
+          if (alive) setGate(rows[0] ? { season: rows[0] } : 'onboarding');
+        } catch {
+          if (alive) setGate('onboarding');
+        }
+      })();
       return () => {
         alive = false;
       };
     }, []),
   );
 
-  if (season === undefined) return <Screen>{null}</Screen>;
-  if (season === null) return <Redirect href="/onboarding" />;
-  return <DashboardBody season={season} />;
+  if (gate === 'loading') return <Screen>{null}</Screen>;
+  if (gate === 'sk') return <Redirect href="/team" />;
+  if (gate === 'onboarding') return <Redirect href="/onboarding" />;
+  return <DashboardBody season={gate.season} />;
 }
 
 function DashboardBody({ season }: { season: Season }) {
@@ -91,6 +99,21 @@ function DashboardBody({ season }: { season: Season }) {
       >
         <Display size={32}>Batter&apos;s Box</Display>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.l }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Switch to Scorekeeper Mode"
+            hitSlop={8}
+            onPress={() => {
+              void (async () => {
+                // Write the mode before navigating so the focus gate can't
+                // bounce us straight back here.
+                await setAppMode('scorekeeper');
+                router.replace('/team');
+              })();
+            }}
+          >
+            <MaterialCommunityIcons name="scoreboard-outline" size={24} color={colors.textSoft} />
+          </Pressable>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Your baseball card"

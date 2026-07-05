@@ -13,6 +13,9 @@ describe('computeLine', () => {
     expect(line.slg).toBeNull();
     expect(line.ops).toBeNull();
     expect(line.kRate).toBeNull();
+    expect(line.iso).toBeNull();
+    expect(line.babip).toBeNull();
+    expect(line.woba).toBeNull();
   });
 
   it('computes a simple game correctly', () => {
@@ -26,6 +29,9 @@ describe('computeLine', () => {
     expect(line.obp).toBeCloseTo(3 / 4, 10); // (2 H + 1 BB) / (3 AB + 1 BB)
     expect(line.slg).toBeCloseTo(5 / 3, 10);
     expect(line.ops).toBeCloseTo(3 / 4 + 5 / 3, 10);
+    expect(line.iso).toBeCloseTo(3 / 3, 10); // (5 TB − 2 H) / 3 AB
+    expect(line.babip).toBeCloseTo(1 / 1, 10); // (2−1 HR) / (3−1 K−1 HR)
+    expect(line.woba).toBeCloseTo((0.89 + 0.69 + 2.1) / 4, 10); // 1B + BB + HR over AB+BB
   });
 
   it('sac fly counts against OBP but sac bunt does not', () => {
@@ -55,6 +61,9 @@ describe('computeLine', () => {
     expect(line.slg).toBeNull();
     expect(line.ops).toBeNull(); // OPS undefined without SLG
     expect(line.bbRate).toBeCloseTo(2 / 3, 10);
+    expect(line.iso).toBeNull(); // no at-bats → no power to isolate
+    expect(line.babip).toBeNull(); // no balls in play
+    expect(line.woba).toBeCloseTo((2 * 0.69 + 0.72) / 3, 10); // walks still count
   });
 
   it('matches a hand-computed season line (golden test)', () => {
@@ -83,6 +92,10 @@ describe('computeLine', () => {
     expect(line.slg).toBeCloseTo(13 / 24, 10);
     expect(line.ops).toBeCloseTo(12 / 29 + 13 / 24, 10);
     expect(line.kRate).toBeCloseTo(6 / 30, 10);
+    expect(line.iso).toBeCloseTo(5 / 24, 10); // (13 TB − 8 H) / 24 AB
+    expect(line.babip).toBeCloseTo(7 / 18, 10); // (8−1) / (24−6−1+1)
+    // 3 BB·.69 + 1 HBP·.72 + 5·.89 + 2·1.27 + 1·2.10 over 24 AB + 3 BB + 1 SF + 1 HBP
+    expect(line.woba).toBeCloseTo((3 * 0.69 + 0.72 + 5 * 0.89 + 2 * 1.27 + 2.1) / 29, 10);
   });
 });
 

@@ -1,0 +1,6 @@
+Starting project at C:\Users\Tai Meade\PersonalDevelopment\battersbox
+Using src/app as the root directory for Expo Router.
+Metro is running in CI mode, reloads are disabled. Remove CI=true to enable watch mode.
+Starting Metro Bundler
+Waiting on http://localhost:8090
+Logs for your project will appear below.

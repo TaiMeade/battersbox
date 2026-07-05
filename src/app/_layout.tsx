@@ -51,7 +51,7 @@ export default function RootLayout() {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
         <Text style={{ textAlign: 'center' }}>
-          BattersBox couldn't open its database.{'\n'}Restart the app to try again.
+          BattersBox couldn&apos;t open its database.{'\n'}Restart the app to try again.
           {'\n\n'}
           {migrationError.message}
         </Text>
@@ -71,6 +71,7 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="(sk)" />
         <Stack.Screen name="onboarding" options={{ gestureEnabled: false }} />
         <Stack.Screen name="card" options={{ presentation: 'modal' }} />
       </Stack>

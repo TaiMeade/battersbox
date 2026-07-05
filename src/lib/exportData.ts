@@ -10,12 +10,19 @@ import {
   players,
   seasons,
   settings,
+  skGames,
+  skInningRuns,
+  skLineupSlots,
+  skPlateAppearances,
+  skPlayers,
+  skTeams,
   type Season,
 } from '@/db/schema';
 import { todayISO } from '@/db/repo';
 import { buildSeasonCSV } from '@/domain/seasonCsv';
 
-const BACKUP_VERSION = 1;
+// v2 added the Scorekeeper Mode sk_* tables (optional fields — v1 files still restore).
+const BACKUP_VERSION = 2;
 
 // ---------------------------------------------------------------- CSV export
 
@@ -70,6 +77,13 @@ interface BackupPayload {
   games: (typeof games.$inferSelect)[];
   plateAppearances: (typeof plateAppearances.$inferSelect)[];
   settings: (typeof settings.$inferSelect)[];
+  // Scorekeeper Mode (absent in v1 backups — restored as empty).
+  skTeams?: (typeof skTeams.$inferSelect)[];
+  skPlayers?: (typeof skPlayers.$inferSelect)[];
+  skGames?: (typeof skGames.$inferSelect)[];
+  skLineupSlots?: (typeof skLineupSlots.$inferSelect)[];
+  skPlateAppearances?: (typeof skPlateAppearances.$inferSelect)[];
+  skInningRuns?: (typeof skInningRuns.$inferSelect)[];
 }
 
 /** Full-database dump. This is the v1 backup story — no cloud, just a file you keep. */
@@ -83,6 +97,12 @@ export async function exportBackup(): Promise<void> {
     games: await db.select().from(games),
     plateAppearances: await db.select().from(plateAppearances),
     settings: await db.select().from(settings),
+    skTeams: await db.select().from(skTeams),
+    skPlayers: await db.select().from(skPlayers),
+    skGames: await db.select().from(skGames),
+    skLineupSlots: await db.select().from(skLineupSlots),
+    skPlateAppearances: await db.select().from(skPlateAppearances),
+    skInningRuns: await db.select().from(skInningRuns),
   };
   await writeAndShare(
     `battersbox-backup-${todayISO()}.json`,
@@ -94,14 +114,18 @@ export async function exportBackup(): Promise<void> {
 function isBackupPayload(data: unknown): data is BackupPayload {
   if (typeof data !== 'object' || data === null) return false;
   const p = data as Record<string, unknown>;
+  const skFieldsOk = (
+    ['skTeams', 'skPlayers', 'skGames', 'skLineupSlots', 'skPlateAppearances', 'skInningRuns'] as const
+  ).every((key) => p[key] === undefined || Array.isArray(p[key]));
   return (
     p.app === 'battersbox' &&
-    p.version === BACKUP_VERSION &&
+    (p.version === 1 || p.version === BACKUP_VERSION) &&
     Array.isArray(p.players) &&
     Array.isArray(p.seasons) &&
     Array.isArray(p.games) &&
     Array.isArray(p.plateAppearances) &&
-    Array.isArray(p.settings)
+    Array.isArray(p.settings) &&
+    skFieldsOk
   );
 }
 
@@ -128,6 +152,12 @@ export async function restoreBackup(): Promise<RestoreResult> {
   if (!isBackupPayload(data)) return 'invalid';
 
   // Children first on the way out, parents first on the way back in.
+  await db.delete(skPlateAppearances);
+  await db.delete(skInningRuns);
+  await db.delete(skLineupSlots);
+  await db.delete(skGames);
+  await db.delete(skPlayers);
+  await db.delete(skTeams);
   await db.delete(plateAppearances);
   await db.delete(games);
   await db.delete(seasons);
@@ -141,6 +171,21 @@ export async function restoreBackup(): Promise<RestoreResult> {
     await db.insert(plateAppearances).values(chunk);
   }
   if (data.settings.length > 0) await db.insert(settings).values(data.settings);
+
+  const skTeamRows = data.skTeams ?? [];
+  const skPlayerRows = data.skPlayers ?? [];
+  if (skTeamRows.length > 0) await db.insert(skTeams).values(skTeamRows);
+  for (const chunk of chunks(skPlayerRows, 100)) await db.insert(skPlayers).values(chunk);
+  for (const chunk of chunks(data.skGames ?? [], 100)) await db.insert(skGames).values(chunk);
+  for (const chunk of chunks(data.skLineupSlots ?? [], 100)) {
+    await db.insert(skLineupSlots).values(chunk);
+  }
+  for (const chunk of chunks(data.skPlateAppearances ?? [], 100)) {
+    await db.insert(skPlateAppearances).values(chunk);
+  }
+  for (const chunk of chunks(data.skInningRuns ?? [], 100)) {
+    await db.insert(skInningRuns).values(chunk);
+  }
 
   return 'restored';
 }

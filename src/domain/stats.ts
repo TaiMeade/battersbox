@@ -28,7 +28,27 @@ export interface StatLine {
   /** K and BB rates per plate appearance. */
   kRate: number | null;
   bbRate: number | null;
+  /** Isolated power: extra bases per at-bat (SLG − AVG). */
+  iso: number | null;
+  /** Batting average on balls in play: (H − HR) / (AB − K − HR + SF). */
+  babip: number | null;
+  /** Weighted on-base average — every way aboard, weighted by its run value. */
+  woba: number | null;
 }
+
+/**
+ * FanGraphs-style linear weights, fixed to a representative recent season.
+ * The official constants drift a little year to year; for a rec-league
+ * log, a stable yardstick beats a moving target.
+ */
+const WOBA_WEIGHTS = {
+  bb: 0.69,
+  hbp: 0.72,
+  single: 0.89,
+  double: 1.27,
+  triple: 1.62,
+  hr: 2.1,
+} as const;
 
 export function computeLine(outcomes: OutcomeCode[]): StatLine {
   let ab = 0;
@@ -54,23 +74,38 @@ export function computeLine(outcomes: OutcomeCode[]): StatLine {
   const slg = ab > 0 ? tb / ab : null;
   const ops = avg !== null && obp !== null ? obp + slg! : null;
 
+  const singles = counts['1B'] ?? 0;
   const doubles = counts['2B'] ?? 0;
   const triples = counts['3B'] ?? 0;
   const hr = counts.HR ?? 0;
+  const bb = counts.BB ?? 0;
+  const hbp = counts.HBP ?? 0;
+  const k = counts.K ?? 0;
+  const sf = counts.SF ?? 0;
+
+  const babipDen = ab - k - hr + sf;
+  const wobaDen = ab + bb + sf + hbp;
+  const wobaNum =
+    WOBA_WEIGHTS.bb * bb +
+    WOBA_WEIGHTS.hbp * hbp +
+    WOBA_WEIGHTS.single * singles +
+    WOBA_WEIGHTS.double * doubles +
+    WOBA_WEIGHTS.triple * triples +
+    WOBA_WEIGHTS.hr * hr;
 
   return {
     pa,
     ab,
     h,
-    singles: counts['1B'] ?? 0,
+    singles,
     doubles,
     triples,
     hr,
     xbh: doubles + triples + hr,
-    bb: counts.BB ?? 0,
-    hbp: counts.HBP ?? 0,
-    k: counts.K ?? 0,
-    sf: counts.SF ?? 0,
+    bb,
+    hbp,
+    k,
+    sf,
     sac: counts.SAC ?? 0,
     tb,
     counts,
@@ -78,8 +113,11 @@ export function computeLine(outcomes: OutcomeCode[]): StatLine {
     obp,
     slg,
     ops,
-    kRate: pa > 0 ? (counts.K ?? 0) / pa : null,
-    bbRate: pa > 0 ? (counts.BB ?? 0) / pa : null,
+    kRate: pa > 0 ? k / pa : null,
+    bbRate: pa > 0 ? bb / pa : null,
+    iso: ab > 0 ? (tb - h) / ab : null,
+    babip: babipDen > 0 ? (h - hr) / babipDen : null,
+    woba: wobaDen > 0 ? wobaNum / wobaDen : null,
   };
 }
 

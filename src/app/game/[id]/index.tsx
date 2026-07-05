@@ -16,7 +16,7 @@ import { SprayCapture } from '@/components/spray/SprayCapture';
 import { Body, Eyebrow, Mono } from '@/components/typography';
 import { UndoSnackbar } from '@/components/UndoSnackbar';
 import { db } from '@/db/client';
-import { endGame, logPA, setGameOpponent, setPASpray } from '@/db/repo';
+import { endGame, logPA, setGameOpponent, setPASpray, undoPA } from '@/db/repo';
 import { games, plateAppearances } from '@/db/schema';
 import type { Milestone } from '@/domain/milestones';
 import { OUTCOME_SPECS, isOutcomeCode, type OutcomeCode } from '@/domain/outcomes';
@@ -90,7 +90,7 @@ export default function LiveGame() {
       setSprayFor({ paId: pa.id, outcome: code });
       pendingMilestone.current = milestone;
     } else {
-      showUndo({ paId: pa.id, label: `Logged: ${OUTCOME_SPECS[code].name}` });
+      showUndo({ label: `Logged: ${OUTCOME_SPECS[code].name}`, onUndo: () => undoPA(pa.id) });
       if (milestone) setCelebration(milestone);
     }
   };
@@ -98,7 +98,11 @@ export default function LiveGame() {
   const finishSpray = (place?: { x: number; y: number }) => {
     if (!sprayFor) return;
     if (place) void setPASpray(sprayFor.paId, place.x, place.y);
-    showUndo({ paId: sprayFor.paId, label: `Logged: ${OUTCOME_SPECS[sprayFor.outcome].name}` });
+    const sprayPaId = sprayFor.paId;
+    showUndo({
+      label: `Logged: ${OUTCOME_SPECS[sprayFor.outcome].name}`,
+      onUndo: () => undoPA(sprayPaId),
+    });
     setSprayFor(null);
     if (pendingMilestone.current) {
       setCelebration(pendingMilestone.current);

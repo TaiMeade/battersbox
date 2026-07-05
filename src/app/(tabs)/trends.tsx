@@ -1,6 +1,6 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { OutcomeMixBars } from '@/components/charts/OutcomeMixBars';
@@ -13,6 +13,7 @@ import { SeasonShareCard } from '@/components/share/ShareCards';
 import { SprayField, SprayLegend, type SprayPoint } from '@/components/spray/SprayField';
 import { Body, Display, Eyebrow, Mono } from '@/components/typography';
 import { db } from '@/db/client';
+import { getSetting, setSetting } from '@/db/repo';
 import { players } from '@/db/schema';
 import { computeSeasonRecords } from '@/domain/milestones';
 import { OUTCOME_SPECS, type OutcomeCode } from '@/domain/outcomes';
@@ -105,6 +106,18 @@ export default function Trends() {
     );
   };
 
+  // "More stats" stays the way you left it, across sessions.
+  const [nerdOpen, setNerdOpen] = useState(false);
+  useEffect(() => {
+    void getSetting('prefs.nerdStats').then((v) => setNerdOpen(v === '1'));
+  }, []);
+  const toggleNerd = () => {
+    setNerdOpen((open) => {
+      void setSetting('prefs.nerdStats', open ? '0' : '1');
+      return !open;
+    });
+  };
+
   return (
     <Screen>
       <View style={{ paddingVertical: spacing.s, gap: spacing.m }}>
@@ -171,6 +184,61 @@ export default function Trends() {
               </Body>
             </View>
           </ScoreboardPanel>
+
+          <View style={{ gap: spacing.m }}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded: nerdOpen }}
+              accessibilityLabel="More stats"
+              onPress={toggleNerd}
+              hitSlop={8}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}
+            >
+              <Eyebrow>More stats</Eyebrow>
+              <MaterialCommunityIcons
+                name={nerdOpen ? 'chevron-up' : 'chevron-down'}
+                size={16}
+                color={colors.textSoft}
+              />
+            </Pressable>
+            {nerdOpen && (
+              <View
+                style={{
+                  borderWidth: 1,
+                  borderColor: colors.line,
+                  borderRadius: radius.m,
+                  backgroundColor: colors.card,
+                }}
+              >
+                <NerdRow
+                  label="wOBA"
+                  sub="Every way on base, weighted by its run value"
+                  value={formatAvg(line.woba)}
+                />
+                <NerdRow
+                  label="ISO"
+                  sub="Isolated power — extra bases per at-bat"
+                  value={formatAvg(line.iso)}
+                />
+                <NerdRow
+                  label="BABIP"
+                  sub="Batting average when the ball lands in play"
+                  value={formatAvg(line.babip)}
+                />
+                <NerdRow
+                  label="K%"
+                  sub="Trips that end in a strikeout"
+                  value={formatRate(line.kRate)}
+                />
+                <NerdRow
+                  label="BB%"
+                  sub="Trips that end in a walk"
+                  value={formatRate(line.bbRate)}
+                  last
+                />
+              </View>
+            )}
+          </View>
 
           {scope === 'season' && (
             <View style={{ gap: spacing.m }}>
@@ -255,6 +323,42 @@ export default function Trends() {
 function streakValue(n: number, live: boolean): string {
   if (n === 0) return '—';
   return `${n} ${n === 1 ? 'game' : 'games'}${live ? ' · live' : ''}`;
+}
+
+function NerdRow({
+  label,
+  sub,
+  value,
+  last = false,
+}: {
+  label: string;
+  sub: string;
+  value: string;
+  last?: boolean;
+}) {
+  const { colors } = useTheme();
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: spacing.m,
+        paddingHorizontal: spacing.l,
+        paddingVertical: spacing.m,
+        borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth,
+        borderBottomColor: colors.line,
+      }}
+    >
+      <View style={{ flex: 1, gap: 1 }}>
+        <Body size={14}>{label}</Body>
+        <Body size={12} color={colors.textSoft}>
+          {sub}
+        </Body>
+      </View>
+      <Mono size={16}>{value}</Mono>
+    </View>
+  );
 }
 
 function RecordRow({ label, value, last = false }: { label: string; value: string; last?: boolean }) {
