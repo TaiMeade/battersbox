@@ -8,9 +8,11 @@
     "scheme": "battersbox",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.taimeade.battersbox"
     },
     "android": {
+      "package": "com.taimeade.battersbox",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

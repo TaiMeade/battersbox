@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { OutcomeMixBars } from '@/components/charts/OutcomeMixBars';
-import { TrendChart, type TrendPoint } from '@/components/charts/TrendChart';
+import { TrendChart } from '@/components/charts/TrendChart';
 import { Chips } from '@/components/Chips';
 import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
@@ -18,12 +18,14 @@ import { players } from '@/db/schema';
 import { computeSeasonRecords } from '@/domain/milestones';
 import { OUTCOME_SPECS, type OutcomeCode } from '@/domain/outcomes';
 import { computeLine, formatAvg, formatRate } from '@/domain/stats';
+import { cumulativeTrendPoints, type TrendPoint } from '@/domain/trend';
 import {
   groupOutcomesByGame,
   useActiveSeason,
   useCareerOutcomes,
   useSeasonGames,
   useSeasonPAs,
+  useSeasons,
 } from '@/hooks/useSeasonData';
 import { shareViewImage } from '@/lib/shareImage';
 import { radius, spacing } from '@/theme/tokens';
@@ -52,24 +54,31 @@ export default function Trends() {
       ? seasonPARows === undefined || seasonGames === undefined
       : career === undefined;
 
-  // Cumulative season-to-date line after each game, in chronological order.
-  const trendPoints = useMemo<TrendPoint[]>(() => {
+  // Per-game outcome lists in chronological order — the trend line,
+  // streaks, and records all build from this.
+  const seasonGameOutcomes = useMemo<OutcomeCode[][]>(() => {
     if (!seasonGames || !seasonPARows) return [];
     const byGame = groupOutcomesByGame(seasonPARows);
-    const chronological = [...seasonGames].reverse();
-    const running: OutcomeCode[] = [];
-    const points: TrendPoint[] = [];
-    let n = 0;
-    for (const game of chronological) {
-      const gameOutcomes = byGame.get(game.id);
-      if (!gameOutcomes || gameOutcomes.length === 0) continue;
-      running.push(...gameOutcomes);
-      n += 1;
-      const soFar = computeLine(running);
-      points.push({ game: n, avg: soFar.avg, ops: soFar.ops });
-    }
-    return points;
+    return [...seasonGames]
+      .reverse()
+      .map((g) => byGame.get(g.id) ?? [])
+      .filter((o) => o.length > 0);
   }, [seasonGames, seasonPARows]);
+  const trendPoints = useMemo(() => cumulativeTrendPoints(seasonGameOutcomes), [seasonGameOutcomes]);
+
+  // Season vs. season compare: overlay another season's cumulative line.
+  const allSeasons = useSeasons();
+  const compareOptions = allSeasons.filter((s) => s.id !== season?.id);
+  const [compareId, setCompareId] = useState<string | null>(null);
+  // Resolved through the list so a deleted (or now-active) season falls back to off.
+  const compareSeason = compareOptions.find((s) => s.id === compareId);
+  const comparePARows = useSeasonPAs(compareSeason?.id);
+  const compareGames = useSeasonGames(compareSeason?.id);
+  const comparePoints = useMemo<TrendPoint[]>(() => {
+    if (!compareGames || !comparePARows) return [];
+    const byGame = groupOutcomesByGame(comparePARows);
+    return cumulativeTrendPoints([...compareGames].reverse().map((g) => byGame.get(g.id) ?? []));
+  }, [compareGames, comparePARows]);
 
   // Located batted balls for the season spray chart.
   const sprayPoints = useMemo<SprayPoint[]>(() => {
@@ -88,15 +97,6 @@ export default function Trends() {
     [seasonPARows],
   );
 
-  // Per-game outcome lists in chronological order, for streaks and records.
-  const seasonGameOutcomes = useMemo<OutcomeCode[][]>(() => {
-    if (!seasonGames || !seasonPARows) return [];
-    const byGame = groupOutcomesByGame(seasonPARows);
-    return [...seasonGames]
-      .reverse()
-      .map((g) => byGame.get(g.id) ?? [])
-      .filter((o) => o.length > 0);
-  }, [seasonGames, seasonPARows]);
   const records = useMemo(() => computeSeasonRecords(seasonGameOutcomes), [seasonGameOutcomes]);
 
   const shotRef = useRef<View>(null);
@@ -244,7 +244,33 @@ export default function Trends() {
             <View style={{ gap: spacing.m }}>
               <Eyebrow>Season trend</Eyebrow>
               {trendPoints.length >= 2 ? (
-                <TrendChart points={trendPoints} />
+                <>
+                  {compareOptions.length > 0 && (
+                    <Chips
+                      options={[
+                        { key: 'off', label: 'No compare' },
+                        ...compareOptions.map((s) => ({ key: s.id, label: `vs ${s.name}` })),
+                      ]}
+                      value={compareSeason?.id ?? 'off'}
+                      onChange={(key) => setCompareId(key === 'off' ? null : key)}
+                    />
+                  )}
+                  <TrendChart
+                    points={trendPoints}
+                    label={season?.name}
+                    compare={
+                      compareSeason && comparePoints.length >= 2
+                        ? { points: comparePoints, label: compareSeason.name }
+                        : undefined
+                    }
+                  />
+                  {compareSeason && comparePoints.length < 2 && (
+                    <Body size={13} color={colors.textSoft}>
+                      {compareSeason.name} needs at-bats in two games before its line can be
+                      drawn.
+                    </Body>
+                  )}
+                </>
               ) : (
                 <Body color={colors.textSoft}>
                   Log at-bats in two games and your cumulative AVG and OPS lines start here.

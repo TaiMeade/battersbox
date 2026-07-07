@@ -192,6 +192,7 @@ function TeamBody({ team, teams }: { team: SkTeam; teams: SkTeam[] }) {
         contentContainerStyle={{ gap: spacing.l, paddingBottom: spacing.l }}
         style={{ flex: 1 }}
         keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
       >
         {teams.length > 1 && (
           <Chips

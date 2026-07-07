@@ -14,6 +14,7 @@ import {
   type Season,
   type Sport,
 } from './schema';
+import { parseGoals, serializeGoals, type SeasonGoals } from '@/domain/goals';
 import { OUTCOME_SPECS, type OutcomeCode } from '@/domain/outcomes';
 
 const now = () => Date.now();
@@ -81,6 +82,7 @@ export async function deleteSeason(id: string): Promise<void> {
   }
   await db.delete(games).where(eq(games.seasonId, id));
   await db.delete(seasons).where(eq(seasons.id, id));
+  await db.delete(settings).where(eq(settings.key, goalsKey(id)));
 
   const remaining = await db.select().from(seasons).orderBy(desc(seasons.createdAt)).limit(1);
   if (remaining.length > 0) {
@@ -200,4 +202,17 @@ export async function setSetting(key: string, value: string): Promise<void> {
     .insert(settings)
     .values({ key, value })
     .onConflictDoUpdate({ target: settings.key, set: { value } });
+}
+
+// ---------------------------------------------------------------- goals
+
+/** Goals live in the settings KV (not a table) so backups carry them for free. */
+export const goalsKey = (seasonId: string) => `goals.${seasonId}`;
+
+export async function getSeasonGoals(seasonId: string): Promise<SeasonGoals> {
+  return parseGoals(await getSetting(goalsKey(seasonId)));
+}
+
+export async function setSeasonGoals(seasonId: string, goals: SeasonGoals): Promise<void> {
+  await setSetting(goalsKey(seasonId), serializeGoals(goals));
 }

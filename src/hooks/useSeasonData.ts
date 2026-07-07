@@ -2,7 +2,9 @@ import { desc, eq } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 
 import { db } from '@/db/client';
-import { games, plateAppearances, seasons, type Game, type Season } from '@/db/schema';
+import { games, plateAppearances, seasons, settings, type Game, type Season } from '@/db/schema';
+import { goalsKey } from '@/db/repo';
+import { EMPTY_GOALS, parseGoals, type SeasonGoals } from '@/domain/goals';
 import { isOutcomeCode, type OutcomeCode } from '@/domain/outcomes';
 
 /**
@@ -71,6 +73,20 @@ export function useCareerOutcomes(): OutcomeCode[] | undefined {
   );
   if (updatedAt === undefined) return undefined;
   return data.map((r) => r.outcome).filter(isOutcomeCode);
+}
+
+/** The season's goals, live. `undefined` until the first read lands. */
+export function useSeasonGoals(seasonId: string | undefined): SeasonGoals | undefined {
+  const { data, updatedAt } = useLiveQuery(
+    db
+      .select()
+      .from(settings)
+      .where(eq(settings.key, goalsKey(seasonId ?? ''))),
+    [seasonId],
+  );
+  if (!seasonId) return EMPTY_GOALS;
+  if (updatedAt === undefined) return undefined;
+  return parseGoals(data[0]?.value);
 }
 
 export function groupOutcomesByGame(rows: SeasonPARow[]): Map<string, OutcomeCode[]> {

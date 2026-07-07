@@ -103,6 +103,15 @@ export default function SkLiveGame() {
   const dueUp = dueUpSlotId(slots, lastPa?.lineupSlotId ?? null);
   const activeSlotId = expandedSlotId ?? dueUp;
 
+  // Rotate the display so whoever's due up is always the top card and
+  // batters who already hit wrap to the bottom. Edit mode keeps the true
+  // batting order so move up/down reads sanely.
+  const displayLineup = useMemo(() => {
+    const rows = lineup ?? [];
+    const idx = editMode || dueUp === null ? -1 : rows.findIndex((row) => row.id === dueUp);
+    return idx > 0 ? [...rows.slice(idx), ...rows.slice(0, idx)] : rows;
+  }, [lineup, editMode, dueUp]);
+
   const lineScore = useMemo(
     () => buildLineScore(runRows ?? [], game?.currentInning ?? 1),
     [runRows, game?.currentInning],
@@ -163,6 +172,7 @@ export default function SkLiveGame() {
         contentContainerStyle={{ gap: spacing.l, paddingBottom: spacing.l }}
         style={{ flex: 1 }}
         keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
       >
         <ScoreboardPanel
           title={formatDate(game.playedOn)}
@@ -227,7 +237,7 @@ export default function SkLiveGame() {
         ) : null}
 
         <View style={{ gap: spacing.s }}>
-          {(lineup ?? []).map((slot, index) => (
+          {displayLineup.map((slot, index) => (
             <LineupRow
               key={slot.id}
               slot={slot}
@@ -236,7 +246,7 @@ export default function SkLiveGame() {
               expanded={!editMode && slot.id === activeSlotId && slot.scratchedAt === null}
               editMode={editMode}
               isFirst={index === 0}
-              isLast={index === (lineup ?? []).length - 1}
+              isLast={index === displayLineup.length - 1}
               onHeaderTap={() => {
                 if (editMode || slot.scratchedAt !== null) return;
                 setExpandedSlotId(slot.id === activeSlotId ? null : slot.id);

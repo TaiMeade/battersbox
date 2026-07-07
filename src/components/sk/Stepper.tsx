@@ -51,7 +51,14 @@ export function Stepper({
       </Eyebrow>
       <View style={styles.row}>
         {button('minus', onDec, decDisabled)}
-        <Mono size={24} color={colors.accent} style={styles.value} numberOfLines={1}>
+        <Mono
+          size={24}
+          color={colors.accent}
+          style={styles.value}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.6}
+        >
           {String(value)}
         </Mono>
         {button('plus', onInc, false)}
@@ -65,14 +72,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.xs,
     flex: 1,
+    minWidth: 0,
   },
+  // Sized to fit three-up on the panel of the narrowest iPhones: the row
+  // fills its third, buttons stay fixed, and the value flexes (shrinking
+  // its font before ever spilling into the neighboring stepper).
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.s,
+    alignSelf: 'stretch',
+    gap: spacing.xs,
   },
   button: {
-    width: 40,
+    width: 36,
     height: 40,
     borderRadius: radius.s,
     borderWidth: 1,
@@ -80,7 +92,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   value: {
-    minWidth: 34,
+    flex: 1,
+    minWidth: 0,
     textAlign: 'center',
   },
 });

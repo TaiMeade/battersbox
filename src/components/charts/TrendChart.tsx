@@ -4,36 +4,51 @@ import Svg, { Circle, Line, Polyline, Text as SvgText } from 'react-native-svg';
 
 import { Body } from '@/components/typography';
 import { formatAvg } from '@/domain/stats';
+import type { TrendPoint } from '@/domain/trend';
 import { fonts, spacing } from '@/theme/tokens';
 import { useTheme } from '@/theme/useTheme';
 
-export interface TrendPoint {
-  /** 1-based game number. */
-  game: number;
-  avg: number | null;
-  ops: number | null;
-}
+export type { TrendPoint };
 
 const HEIGHT = 190;
 const PAD = { top: 14, right: 44, bottom: 26, left: 40 };
+const COMPARE_DASH = '6 5';
 
 /**
- * Cumulative AVG + OPS across the season, one point per game.
- * Two series → legend above + direct labels at the line ends;
- * text wears text tokens, the colored mark carries identity.
+ * Cumulative AVG + OPS across the season, one point per game — optionally
+ * overlaid with a second season for comparison. Hue carries the metric
+ * (same in both seasons); line style carries the season: solid = current,
+ * dashed = compare. Direct end labels stay on the current season only.
  */
-export function TrendChart({ points }: { points: TrendPoint[] }) {
+export function TrendChart({
+  points,
+  label,
+  compare,
+}: {
+  points: TrendPoint[];
+  /** Name for the primary season in the legend — only shown while comparing. */
+  label?: string;
+  compare?: { points: TrendPoint[]; label: string };
+}) {
   const { colors } = useTheme();
   const [width, setWidth] = useState(0);
 
   const avgSeries = points.filter((p): p is TrendPoint & { avg: number } => p.avg !== null);
   const opsSeries = points.filter((p): p is TrendPoint & { ops: number } => p.ops !== null);
+  const cmpPoints = compare?.points ?? [];
+  const cmpAvgSeries = cmpPoints.filter((p): p is TrendPoint & { avg: number } => p.avg !== null);
+  const cmpOpsSeries = cmpPoints.filter((p): p is TrendPoint & { ops: number } => p.ops !== null);
 
-  const allValues = [...avgSeries.map((p) => p.avg), ...opsSeries.map((p) => p.ops)];
+  const allValues = [
+    ...avgSeries.map((p) => p.avg),
+    ...opsSeries.map((p) => p.ops),
+    ...cmpAvgSeries.map((p) => p.avg),
+    ...cmpOpsSeries.map((p) => p.ops),
+  ];
   if (allValues.length === 0) return null;
 
   const yMax = Math.max(1, Math.ceil(Math.max(...allValues) * 4) / 4);
-  const xMax = Math.max(...points.map((p) => p.game));
+  const xMax = Math.max(...points.map((p) => p.game), ...cmpPoints.map((p) => p.game));
   const xMin = 1;
 
   const plotW = Math.max(width - PAD.left - PAD.right, 1);
@@ -65,9 +80,15 @@ export function TrendChart({ points }: { points: TrendPoint[] }) {
 
   return (
     <View style={{ gap: spacing.s }}>
-      <View style={{ flexDirection: 'row', gap: spacing.l }}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.l, rowGap: spacing.xs }}>
         <LegendItem color={colors.chart.avg} label="AVG" />
         <LegendItem color={colors.chart.ops} label="OPS" />
+        {compare && (
+          <>
+            <LineKey label={label ?? 'This season'} />
+            <LineKey dashed label={compare.label} />
+          </>
+        )}
       </View>
       <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
         {width > 0 && (
@@ -110,6 +131,28 @@ export function TrendChart({ points }: { points: TrendPoint[] }) {
                 {`G${tick}`}
               </SvgText>
             ))}
+
+            {/* compare season underneath: same hues, dashed, no end marks */}
+            {cmpOpsSeries.length > 1 && (
+              <Polyline
+                points={toPoints(cmpOpsSeries, (p: { ops: number }) => p.ops)}
+                fill="none"
+                stroke={colors.chart.ops}
+                strokeWidth={2}
+                strokeDasharray={COMPARE_DASH}
+                strokeLinejoin="round"
+              />
+            )}
+            {cmpAvgSeries.length > 1 && (
+              <Polyline
+                points={toPoints(cmpAvgSeries, (p: { avg: number }) => p.avg)}
+                fill="none"
+                stroke={colors.chart.avg}
+                strokeWidth={2}
+                strokeDasharray={COMPARE_DASH}
+                strokeLinejoin="round"
+              />
+            )}
 
             {opsSeries.length > 1 && (
               <Polyline
@@ -189,6 +232,26 @@ function LegendItem({ color, label }: { color: string; label: string }) {
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
       <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: color }} />
       <Body size={12} color={colors.textSoft}>
+        {label}
+      </Body>
+    </View>
+  );
+}
+
+/** Season key: line style (solid vs dashed) in neutral ink — hue stays with the metric. */
+function LineKey({ dashed = false, label }: { dashed?: boolean; label: string }) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+      {dashed ? (
+        <View style={{ flexDirection: 'row', gap: 3 }}>
+          <View style={{ width: 5, height: 2, backgroundColor: colors.textSoft }} />
+          <View style={{ width: 5, height: 2, backgroundColor: colors.textSoft }} />
+        </View>
+      ) : (
+        <View style={{ width: 13, height: 2, backgroundColor: colors.textSoft }} />
+      )}
+      <Body size={12} color={colors.textSoft} numberOfLines={1}>
         {label}
       </Body>
     </View>
