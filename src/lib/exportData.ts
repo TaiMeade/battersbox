@@ -1,7 +1,4 @@
 import { asc, eq } from 'drizzle-orm';
-import * as DocumentPicker from 'expo-document-picker';
-import { File, Paths } from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
 
 import { db } from '@/db/client';
 import {
@@ -20,6 +17,7 @@ import {
 } from '@/db/schema';
 import { todayISO } from '@/db/repo';
 import { buildSeasonCSV } from '@/domain/seasonCsv';
+import { pickTextFile, shareTextFile } from '@/lib/files';
 
 // v2 added the Scorekeeper Mode sk_* tables (optional fields — v1 files still restore).
 const BACKUP_VERSION = 2;
@@ -35,12 +33,7 @@ function slugify(name: string): string {
   );
 }
 
-async function writeAndShare(filename: string, content: string, mimeType: string): Promise<void> {
-  const file = new File(Paths.cache, filename);
-  if (file.exists) file.delete();
-  file.write(content);
-  await Sharing.shareAsync(file.uri, { mimeType, dialogTitle: filename });
-}
+const writeAndShare = shareTextFile;
 
 /**
  * One row per plate appearance, each carrying the season line to that point,
@@ -137,15 +130,12 @@ export type RestoreResult = 'restored' | 'canceled' | 'invalid';
 
 /** Replaces the entire database with a previously exported backup file. */
 export async function restoreBackup(): Promise<RestoreResult> {
-  const picked = await DocumentPicker.getDocumentAsync({
-    type: 'application/json',
-    copyToCacheDirectory: true,
-  });
-  if (picked.canceled || picked.assets.length === 0) return 'canceled';
+  const text = await pickTextFile('application/json');
+  if (text === null) return 'canceled';
 
   let data: unknown;
   try {
-    data = JSON.parse(await new File(picked.assets[0].uri).text());
+    data = JSON.parse(text);
   } catch {
     return 'invalid';
   }

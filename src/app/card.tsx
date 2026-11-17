@@ -3,22 +3,9 @@ import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  AccessibilityInfo,
-  Alert,
-  Animated,
-  Easing,
-  InputAccessoryView,
-  Keyboard,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
-  useWindowDimensions,
-  type TextInputProps,
-} from 'react-native';
+import { AccessibilityInfo, Alert, Animated, Easing, InputAccessoryView, Keyboard, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type TextInputProps } from 'react-native';
+
+import { TextInput } from '@/components/TextInput';
 
 import { BigButton } from '@/components/BigButton';
 import {
@@ -338,7 +325,8 @@ function DetailInput({
       placeholderTextColor={colors.textSoft}
       style={[
         styles.input,
-        { flex, borderColor: colors.line, color: colors.text, backgroundColor: colors.card },
+        // minWidth 0: a web text field won't otherwise shrink below its default width
+        { flex, minWidth: 0, borderColor: colors.line, color: colors.text, backgroundColor: colors.card },
       ]}
     />
   );

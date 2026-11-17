@@ -44,6 +44,7 @@
     "drizzle-kit": "^0.31.10",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~10.0.0",
+    "patch-package": "^8.0.1",
     "typescript": "~5.9.2",
     "vitest": "^4.1.9"
   },
@@ -53,12 +54,15 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "vitest run",
+    "test": "vitest run && node --test server/*.test.ts",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "build:dev": "eas build --platform ios --profile development",
     "build:ios": "eas build --platform ios --profile production",
-    "submit:ios": "eas submit --platform ios"
+    "submit:ios": "eas submit --platform ios",
+    "build:web": "expo export -p web --output-dir dist-web && node scripts/web-postbuild.mjs dist-web",
+    "server": "node server/index.ts",
+    "postinstall": "patch-package"
   },
   "private": true
 }

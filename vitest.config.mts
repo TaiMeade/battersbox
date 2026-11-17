@@ -1,8 +1,8 @@
 import { defineConfig } from 'vitest/config';
 
-// Only the pure-TS domain layer is unit tested (no React Native imports).
+// Pure-TS layers only (no React Native imports): the stats engine and sync.
 export default defineConfig({
   test: {
-    include: ['src/domain/**/*.test.ts'],
+    include: ['src/domain/**/*.test.ts', 'src/sync/**/*.test.ts'],
   },
 });

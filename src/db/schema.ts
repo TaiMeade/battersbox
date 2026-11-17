@@ -171,3 +171,21 @@ export type SkGame = typeof skGames.$inferSelect;
 export type SkLineupSlot = typeof skLineupSlots.$inferSelect;
 export type SkPlateAppearance = typeof skPlateAppearances.$inferSelect;
 export type SkInningRun = typeof skInningRuns.$inferSelect;
+
+// -------------------------------------------------------------------- sync
+// The web app syncs with the home server (src/sync). Triggers on every table
+// above write one row here per change; nothing in the app writes these.
+
+/** Local changes not yet sent to the server. */
+export const syncChanges = sqliteTable('sync_changes', {
+  seq: integer('seq').primaryKey({ autoIncrement: true }),
+  tbl: text('tbl').notNull(),
+  rowKey: text('row_key').notNull(),
+  changedAt: integer('changed_at').notNull(),
+});
+
+/** This device's id and how far it has pulled from the server. */
+export const syncState = sqliteTable('sync_state', {
+  key: text('key').primaryKey(),
+  value: text('value').notNull(),
+});
