@@ -2,7 +2,9 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { eq } from 'drizzle-orm';
 import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+
+import { TextInput } from '@/components/TextInput';
 
 import { BigButton } from '@/components/BigButton';
 import { EmptyState } from '@/components/EmptyState';

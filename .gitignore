@@ -41,3 +41,7 @@ example
 # generated native folders
 /ios
 /android
+
+# Web app build and the sync server's data
+dist-web/
+data/

@@ -15,6 +15,20 @@
       "when": 1783209262783,
       "tag": "0001_equal_rawhide_kid",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1794884236627,
+      "tag": "0002_sync_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1794884239792,
+      "tag": "0003_sync_triggers",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,100 @@
+diff --git a/node_modules/expo-sqlite/web/WorkerChannel.ts b/node_modules/expo-sqlite/web/WorkerChannel.ts
+index 7fba380..dd9b72c 100644
+--- a/node_modules/expo-sqlite/web/WorkerChannel.ts
++++ b/node_modules/expo-sqlite/web/WorkerChannel.ts
+@@ -34,14 +34,34 @@ export function sendWorkerResult({
+   };
+ }) {
+   if (syncTrait) {
++    // Patched (BattersBox): the original wrote the length with
++    // `resultArray.set(new Uint32Array([length]), 0)`, which copies into a
++    // byte array and keeps only the lowest byte, so any result over 255 bytes
++    // arrived truncated. It also failed (and left the page waiting) on results
++    // over 1 MB; the buffer now grows, and any failure is reported.
+     const { lockBuffer, resultBuffer } = syncTrait;
+     const lock = new Int32Array(lockBuffer);
+-    const resultArray = new Uint8Array(resultBuffer);
+-    const resultJson = error != null ? serialize({ error }) : serialize({ result });
+-    const resultBytes = new TextEncoder().encode(resultJson);
+-    const length = resultBytes.length;
+-    resultArray.set(new Uint32Array([length]), 0);
+-    resultArray.set(resultBytes, 4);
++    try {
++      let resultJson =
++        error != null ? serialize({ error: error.message ?? String(error) }) : serialize({ result });
++      let resultBytes = new TextEncoder().encode(resultJson);
++      const needed = 4 + resultBytes.length;
++      if (needed > resultBuffer.byteLength) {
++        const growable = resultBuffer as SharedArrayBuffer & { growable?: boolean; maxByteLength?: number; grow?: (n: number) => void };
++        if (growable.growable && growable.maxByteLength! >= needed) {
++          growable.grow!(needed);
++        } else {
++          resultJson = serialize({ error: 'SQLite result too large to return synchronously' });
++          resultBytes = new TextEncoder().encode(resultJson);
++        }
++      }
++      new Uint32Array(resultBuffer, 0, 1)[0] = resultBytes.length;
++      new Uint8Array(resultBuffer).set(resultBytes, 4);
++    } catch (e) {
++      const fallback = new TextEncoder().encode(serialize({ error: `SQLite worker could not return the result: ${String(e)}` }));
++      new Uint32Array(resultBuffer, 0, 1)[0] = fallback.length;
++      new Uint8Array(resultBuffer).set(fallback, 4);
++    }
+     Atomics.store(lock, 0, RESOLVED);
+   } else {
+     if (result) {
+@@ -103,7 +123,7 @@ export function invokeWorkerSync<T extends SQLiteWorkerMessageType & keyof Resul
+   const id = messageId++;
+   const lockBuffer = new SharedArrayBuffer(4);
+   const lock = new Int32Array(lockBuffer);
+-  const resultBuffer = new SharedArrayBuffer(1024 * 1024);
++  const resultBuffer = createResultBuffer();
+   const resultArray = new Uint8Array(resultBuffer);
+ 
+   Atomics.store(lock, 0, PENDING);
+@@ -116,24 +136,20 @@ export function invokeWorkerSync<T extends SQLiteWorkerMessageType & keyof Resul
+     resultBuffer,
+   });
+ 
++  // Patched (BattersBox): the original gave up after a fixed number of spins,
++  // only tens of milliseconds with Atomics.pause, so any query that waited
++  // behind a slow write failed. Wait on the clock instead.
+   let i = 0;
++  const deadline = performance.now() + 30_000;
+   // @ts-expect-error: Remove this when TypeScript supports Atomics.pause
+   const useAtomicsPause = typeof Atomics.pause === 'function';
+   while (Atomics.load(lock, 0) === PENDING) {
+-    ++i;
+-
+     if (useAtomicsPause) {
+-      if (i > 1_000_000) {
+-        throw new Error('Sync operation timeout');
+-      }
+       // @ts-expect-error: Remove this when TypeScript supports Atomics.pause
+       Atomics.pause();
+-    } else {
+-      // NOTE(kudo): Unfortunate for the busy loop,
+-      // because we don't have a way for main thread to yield its execution to other callbacks.
+-      if (i > 1000_000_000) {
+-        throw new Error('Sync operation timeout');
+-      }
++    }
++    if ((++i & 0x3ff) === 0 && performance.now() > deadline) {
++      throw new Error('Sync operation timeout');
+     }
+   }
+ 
+@@ -145,3 +161,13 @@ export function invokeWorkerSync<T extends SQLiteWorkerMessageType & keyof Resul
+   if (error) throw new Error(error);
+   return result;
+ }
++
++/** Patched (BattersBox): 1 MB to start, growable (by the worker) up to 256 MB where browsers allow it. */
++function createResultBuffer(): SharedArrayBuffer {
++  try {
++    // @ts-expect-error: growable SharedArrayBuffer options are ES2024
++    return new SharedArrayBuffer(1024 * 1024, { maxByteLength: 256 * 1024 * 1024 });
++  } catch {
++    return new SharedArrayBuffer(1024 * 1024);
++  }
++}

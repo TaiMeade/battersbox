@@ -53,6 +53,44 @@ npx expo start
 Same flow with Expo Go from the Play Store, or press `a` in the Metro terminal
 if an emulator is running.
 
+## Web app (home screen, synced to the home server)
+
+The same app, built for the browser, so it can live on an iPhone home screen
+without the App Store. It works with no signal (a service worker keeps a copy
+of the app; the data is in the browser's own SQLite) and syncs with a small
+server on `tai-server` whenever it can reach it.
+
+- **Sync:** triggers record every change in `sync_changes`
+  (`scripts/sync-triggers.mjs` writes them from `src/sync/tables.ts`).
+  `src/sync/engine.ts` pushes those rows, then pulls everything newer from
+  the server; the server (`server/`) keeps the newest version of each row
+  (last change wins). The phone build doesn't sync.
+- **HTTPS is required** for the offline copy and the browser database, so it's
+  served through Tailscale: `https://tai-server.tail09d320.ts.net:8444`.
+- **One tab at a time:** the browser's storage lets one page hold the
+  database; a second tab waits until the first is closed.
+- **Moving data from the phone build:** Settings → Back up everything there,
+  then Settings → Restore from backup in the web app.
+
+```sh
+npm run build:web     # expo export + offline file list → dist-web/
+npm run server        # http://127.0.0.1:3700 (DATA_DIR=./data)
+```
+
+On the server (`~/battersbox`):
+
+```sh
+npm ci && npm run build:web && docker compose up -d --build
+sudo tailscale serve --bg --https=8444 http://127.0.0.1:3700   # once
+```
+
+The sync database is backed up nightly at 03:15 to
+`/mnt/media/Backups/battersbox` (30 kept). Health: `curl localhost:3700/api/status`.
+
+Adding a table to the schema: add it to `src/sync/tables.ts`, then
+`npx drizzle-kit generate --custom --name sync_<table>` and fill that file with
+the triggers for the new table (see `scripts/sync-triggers.mjs`).
+
 ## Scripts
 
 ```powershell

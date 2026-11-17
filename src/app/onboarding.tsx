@@ -66,7 +66,7 @@ export default function Onboarding() {
             <Eyebrow color={palette.monsterTextSoft}>Welcome to the</Eyebrow>
             <Text style={styles.title}>Batter&apos;s Box</Text>
             <Body color={palette.monsterTextSoft} size={16}>
-              Your batting line, one tap per at-bat. Everything stays on this phone.
+              Your batting line, one tap per at-bat. {Platform.OS === 'web' ? 'Works with no signal; backs up to your server.' : 'Everything stays on this phone.'}
             </Body>
           </View>
 

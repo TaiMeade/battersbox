@@ -1,0 +1,6 @@
+# The image needs only the server, the shared table list and the built web app.
+*
+!server/
+server/*.test.ts
+!src/sync/tables.ts
+!dist-web/

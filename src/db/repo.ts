@@ -29,9 +29,12 @@ export function todayISO(): string {
 
 // ---------------------------------------------------------------- players
 
-/** v1 has exactly one player. Creates the "Me" row on first use. */
+/**
+ * v1 has exactly one player. Creates the "Me" row on first use. The oldest
+ * row wins, so devices that each made a "Me" before syncing agree on one.
+ */
 export async function ensurePlayer(name = 'Me'): Promise<Player> {
-  const existing = await db.select().from(players).limit(1);
+  const existing = await db.select().from(players).orderBy(asc(players.createdAt), asc(players.id)).limit(1);
   if (existing.length > 0) return existing[0];
   const player: Player = { id: randomUUID(), name, createdAt: now() };
   await db.insert(players).values(player);

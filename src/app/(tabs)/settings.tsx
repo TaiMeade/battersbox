@@ -2,7 +2,9 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+
+import { TextInput } from '@/components/TextInput';
 
 import { BigButton } from '@/components/BigButton';
 import { Chips } from '@/components/Chips';
@@ -21,9 +23,11 @@ import type { Season, Sport } from '@/db/schema';
 import { exportBackup, exportSeasonCSV, restoreBackup } from '@/lib/exportData';
 import { defaultSeasonName } from '@/lib/format';
 import { useActiveSeason, useSeasons } from '@/hooks/useSeasonData';
+import { asc } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { db } from '@/db/client';
 import { players } from '@/db/schema';
+import { syncEnabled, syncNow, useSyncStatus } from '@/sync/client';
 import { fonts, radius, spacing } from '@/theme/tokens';
 import { useTheme } from '@/theme/useTheme';
 
@@ -37,7 +41,7 @@ export default function Settings() {
   const router = useRouter();
   const { season: activeSeason } = useActiveSeason();
   const seasons = useSeasons();
-  const { data: playerRows } = useLiveQuery(db.select().from(players).limit(1));
+  const { data: playerRows } = useLiveQuery(db.select().from(players).orderBy(asc(players.createdAt), asc(players.id)).limit(1));
   const player = playerRows?.[0];
 
   const [name, setName] = useState('');
@@ -142,6 +146,7 @@ export default function Settings() {
         </Section>
 
         <Section title="Your data">
+          {syncEnabled && <SyncRow />}
           <DataRow
             icon="card-account-details-outline"
             label="Baseball card"
@@ -175,13 +180,49 @@ export default function Settings() {
 
         <Section title="About">
           <Body color={colors.textSoft} style={{ lineHeight: 21 }}>
-            BattersBox {Constants.expoConfig?.version ?? ''} — all data lives on this phone. No
-            account, no cloud, no signal needed in the bleachers.
+            {Platform.OS === 'web'
+              ? `BattersBox ${Constants.expoConfig?.version ?? ''}: your stats live on this device and back up to your home server whenever it can reach it. No signal needed in the bleachers.`
+              : `BattersBox ${Constants.expoConfig?.version ?? ''}: all data lives on this phone. No account, no cloud, no signal needed in the bleachers.`}
           </Body>
         </Section>
       </ScrollView>
     </Screen>
   );
+}
+
+/** "Synced 2 min ago" and a Sync now tap, on the web app. */
+function SyncRow() {
+  const { state, lastSyncedAt, pending, message } = useSyncStatus();
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => tick((n) => n + 1), 30_000);
+    return () => clearInterval(timer);
+  }, []);
+  const waiting = pending > 0 ? `${pending} ${pending === 1 ? 'change' : 'changes'} waiting` : '';
+  let description: string;
+  if (state === 'syncing') description = 'Syncing…';
+  else if (state === 'offline') description = `Can’t reach your server. ${waiting ? `${waiting}; they` : 'Changes'} go up when you’re back on Tailscale.`;
+  else if (state === 'error') description = `Sync didn’t work: ${message ?? 'unknown problem'}`;
+  else if (lastSyncedAt) description = `Synced ${ago(lastSyncedAt)}${waiting ? `, ${waiting}` : ''}`;
+  else description = 'Not synced yet';
+  return (
+    <DataRow
+      icon={state === 'offline' || state === 'error' ? 'cloud-off-outline' : 'cloud-sync-outline'}
+      label="Sync now"
+      description={description}
+      disabled={state === 'syncing'}
+      onPress={() => void syncNow()}
+    />
+  );
+}
+
+function ago(at: number): string {
+  const s = Math.max(0, Math.round((Date.now() - at) / 1000));
+  if (s < 45) return 'just now';
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m} min ago`;
+  const h = Math.round(m / 60);
+  return h < 24 ? `${h} hr ago` : `${Math.round(h / 24)} days ago`;
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {

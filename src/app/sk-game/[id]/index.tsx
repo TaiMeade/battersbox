@@ -3,7 +3,9 @@ import { useIsFocused } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState, type ComponentProps } from 'react';
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+
+import { TextInput } from '@/components/TextInput';
 
 import { BigButton } from '@/components/BigButton';
 import { OutcomeGrid } from '@/components/OutcomeGrid';

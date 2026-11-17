@@ -1,0 +1,20 @@
+# BattersBox web app + sync server on tai-server. From ~/battersbox:
+#   npm ci && npm run build:web && docker compose up -d --build
+#
+# Listens on 127.0.0.1:3700 only. Tailscale serves it over HTTPS (the web app
+# needs HTTPS to work offline):
+#   sudo tailscale serve --bg --https=8444 http://127.0.0.1:3700
+#   -> https://tai-server.tail09d320.ts.net:8444
+name: battersbox
+services:
+  battersbox:
+    build: .
+    image: battersbox:local
+    container_name: battersbox
+    network_mode: host                   # 127.0.0.1:3700, reachable by tailscale serve on the host
+    environment:
+      TZ: America/New_York               # the 03:15 nightly backup is local time
+    volumes:
+      - ./data:/app/data
+      - /mnt/media/Backups/battersbox:/backups
+    restart: unless-stopped
