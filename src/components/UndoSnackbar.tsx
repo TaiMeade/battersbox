@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { diagAction } from '@/lib/diag';
 import { fonts, radius, spacing } from '@/theme/tokens';
 import { useTheme } from '@/theme/useTheme';
 import { useUndoStore } from '@/store/undo';
@@ -28,7 +29,10 @@ export function UndoSnackbar() {
         </Text>
         <Pressable
           accessibilityRole="button"
-          onPress={() => void undo()}
+          onPress={() => {
+            diagAction('undo');
+            void undo();
+          }}
           hitSlop={12}
         >
           <Text style={[styles.action, { color: colors.accent }]}>Undo</Text>

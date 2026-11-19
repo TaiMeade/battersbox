@@ -1,5 +1,23 @@
+diff --git a/node_modules/expo-sqlite/web/SQLiteModule.ts b/node_modules/expo-sqlite/web/SQLiteModule.ts
+index 717c987..330e480 100644
+--- a/node_modules/expo-sqlite/web/SQLiteModule.ts
++++ b/node_modules/expo-sqlite/web/SQLiteModule.ts
+@@ -22,6 +22,13 @@ function getWorker(): Worker {
+   if (!worker) {
+     worker = new Worker(new URL('./worker', window.location.href));
+     worker.addEventListener('message', (event) => {
++      if (event.data.type === '__battersboxWorkerSlow') {
++        // Patched (BattersBox): diagnostics, see worker.ts.
++        try {
++          (globalThis as any).__battersboxWorkerSlow?.(event.data.data);
++        } catch {}
++        return;
++      }
+       if (event.data.type === 'onDatabaseChange') {
+         // @ts-expect-error EventEmitter type for NativeModule is not inferred correctly on web.
+         SQLiteModuleInstance.emit(event.data.type, event.data.data);
 diff --git a/node_modules/expo-sqlite/web/WorkerChannel.ts b/node_modules/expo-sqlite/web/WorkerChannel.ts
-index 7fba380..dd9b72c 100644
+index 7fba380..de17a0b 100644
 --- a/node_modules/expo-sqlite/web/WorkerChannel.ts
 +++ b/node_modules/expo-sqlite/web/WorkerChannel.ts
 @@ -34,14 +34,34 @@ export function sendWorkerResult({
@@ -43,6 +61,15 @@ index 7fba380..dd9b72c 100644
      Atomics.store(lock, 0, RESOLVED);
    } else {
      if (result) {
+@@ -81,7 +101,7 @@ export async function invokeWorkerAsync<T extends SQLiteWorkerMessageType & keyo
+   const id = messageId++;
+   const deferred = new Deferred<ResultTypeMap[T]>();
+   deferredMap.set(id, deferred);
+-  worker.postMessage({ type, id, data, isSync: false });
++  worker.postMessage({ type, id, data, isSync: false, sentAt: Date.now() });
+   return deferred.getPromise();
+ }
+ 
 @@ -103,7 +123,7 @@ export function invokeWorkerSync<T extends SQLiteWorkerMessageType & keyof Resul
    const id = messageId++;
    const lockBuffer = new SharedArrayBuffer(4);
@@ -52,9 +79,13 @@ index 7fba380..dd9b72c 100644
    const resultArray = new Uint8Array(resultBuffer);
  
    Atomics.store(lock, 0, PENDING);
-@@ -116,24 +136,20 @@ export function invokeWorkerSync<T extends SQLiteWorkerMessageType & keyof Resul
+@@ -114,28 +134,28 @@ export function invokeWorkerSync<T extends SQLiteWorkerMessageType & keyof Resul
+     isSync: true,
+     lockBuffer,
      resultBuffer,
++    sentAt: Date.now(),
    });
++  const started = performance.now();
  
 +  // Patched (BattersBox): the original gave up after a fixed number of spins,
 +  // only tens of milliseconds with Atomics.pause, so any query that waited
@@ -80,14 +111,30 @@ index 7fba380..dd9b72c 100644
 -      }
 +    }
 +    if ((++i & 0x3ff) === 0 && performance.now() > deadline) {
++      reportSyncCall(type, performance.now() - started, true);
 +      throw new Error('Sync operation timeout');
      }
    }
++  reportSyncCall(type, performance.now() - started, false);
  
-@@ -145,3 +161,13 @@ export function invokeWorkerSync<T extends SQLiteWorkerMessageType & keyof Resul
+   const length = new Uint32Array(resultArray.buffer, 0, 1)[0];
+   const resultCopy = new Uint8Array(length);
+@@ -145,3 +165,25 @@ export function invokeWorkerSync<T extends SQLiteWorkerMessageType & keyof Resul
    if (error) throw new Error(error);
    return result;
  }
++
++/**
++ * Patched (BattersBox): diagnostics. Slow (100 ms+) or timed-out synchronous
++ * calls are handed to the app's diagnostics recorder (src/lib/diag.web.ts),
++ * if it's listening.
++ */
++function reportSyncCall(type: string, ms: number, timedOut: boolean): void {
++  if (ms < 100 && !timedOut) return;
++  try {
++    (globalThis as any).__battersboxSqliteSlow?.(type, Math.round(ms), timedOut);
++  } catch {}
++}
 +
 +/** Patched (BattersBox): 1 MB to start, growable (by the worker) up to 256 MB where browsers allow it. */
 +function createResultBuffer(): SharedArrayBuffer {
@@ -98,3 +145,31 @@ index 7fba380..dd9b72c 100644
 +    return new SharedArrayBuffer(1024 * 1024);
 +  }
 +}
+diff --git a/node_modules/expo-sqlite/web/worker.ts b/node_modules/expo-sqlite/web/worker.ts
+index deaf721..f52f920 100644
+--- a/node_modules/expo-sqlite/web/worker.ts
++++ b/node_modules/expo-sqlite/web/worker.ts
+@@ -64,12 +64,23 @@ class SQLiteErrorException extends Error {}
+ self.onmessage = async (event: MessageEvent<SQLiteWorkerMessage>) => {
+   let result: ResultType | null = null;
+   let error: Error | null = null;
++  // Patched (BattersBox): diagnostics — how long this request queued, and ran.
++  const startedAt = Date.now();
+   try {
+     const message = event.data as MessageTypeMap[typeof event.data.type];
+     result = await handleMessageImpl(message);
+   } catch (e) {
+     error = e instanceof Error ? e : new Error(String(e));
+   }
++  const sentAt = (event.data as { sentAt?: number }).sentAt;
++  const queuedMs = typeof sentAt === 'number' ? startedAt - sentAt : 0;
++  const ranMs = Date.now() - startedAt;
++  if (queuedMs >= 100 || ranMs >= 100) {
++    self.postMessage({
++      type: '__battersboxWorkerSlow',
++      data: { op: event.data.type, sync: !!event.data.isSync, queuedMs, ranMs, error: error ? String(error.message) : undefined },
++    });
++  }
+ 
+   const syncTrait = event.data.isSync
+     ? {

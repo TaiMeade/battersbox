@@ -23,11 +23,13 @@ import { Text, View } from 'react-native';
 import migrations from '../../drizzle/migrations';
 import { db, prepareDatabase } from '@/db/client';
 import { hideBootSplash } from '@/lib/bootSplash';
+import { diag, startDiagnostics } from '@/lib/diag';
 import { registerOfflineSupport } from '@/lib/offline';
 import { installWebAlert } from '@/lib/webAlert';
 import { firstSync, startSync, syncEnabled } from '@/sync/client';
 import { useTheme } from '@/theme/useTheme';
 
+startDiagnostics();
 void SplashScreen.preventAutoHideAsync();
 installWebAlert();
 registerOfflineSupport();
@@ -38,7 +40,19 @@ export default function RootLayout() {
   const [dbError, setDbError] = useState<Error | null>(null);
   const [otherTab, setOtherTab] = useState(false);
   useEffect(() => {
-    prepareDatabase(() => setOtherTab(true)).then(() => setDbReady(true), setDbError);
+    prepareDatabase(() => {
+      diag('boot', { phase: 'waiting for other tab' });
+      setOtherTab(true);
+    }).then(
+      () => {
+        diag('boot', { phase: 'database ready' });
+        setDbReady(true);
+      },
+      (e: Error) => {
+        diag('boot', { phase: 'database failed', msg: e.message });
+        setDbError(e);
+      },
+    );
   }, []);
   // These messages render under the web loading screen; take it away.
   useEffect(() => {
@@ -99,6 +113,7 @@ function ReadyLayout() {
 
   useEffect(() => {
     if (ready || migrationError) {
+      diag('boot', { phase: ready ? 'ready' : 'migration failed', msg: migrationError?.message });
       void SplashScreen.hideAsync();
       hideBootSplash();
     }

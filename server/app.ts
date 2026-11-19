@@ -33,7 +33,11 @@ export interface AppOptions {
   webDir: string;
   /** Extra details for /api/status (e.g. the last backup). */
   status?: () => Record<string, unknown>;
+  /** Where `POST /api/diag` batches from the web app go. Off when absent. */
+  diag?: (batch: unknown) => void;
 }
+
+const MAX_DIAG_BODY = 256 * 1024;
 
 function send(res: ServerResponse, status: number, body: unknown) {
   const text = JSON.stringify(body);
@@ -133,6 +137,20 @@ export function createApp(options: AppOptions) {
           throw err instanceof BadRequest ? err : new BadRequest('body must be JSON');
         }
         return send(res, 200, options.store.push(body));
+      }
+      if (url.pathname === '/api/diag' && req.method === 'POST' && options.diag) {
+        if (!sameOrigin(req)) return send(res, 403, { error: 'Not from this app' });
+        const text = await readBody(req);
+        if (text.length > MAX_DIAG_BODY) throw new BadRequest('too large');
+        let batch: unknown;
+        try {
+          batch = JSON.parse(text);
+        } catch {
+          throw new BadRequest('body must be JSON');
+        }
+        if (!batch || typeof batch !== 'object' || Array.isArray(batch)) throw new BadRequest('body must be an object');
+        options.diag(batch);
+        return send(res, 200, { ok: true });
       }
       if (url.pathname.startsWith('/api/')) return send(res, 404, { error: 'No such endpoint' });
       if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, { error: 'Read only' });
