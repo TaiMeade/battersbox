@@ -179,6 +179,8 @@ export async function updatePAOutcome(paId: string, outcome: OutcomeCode): Promi
 
 /** Batted-ball location, normalized to the field diagram (0..1 of width/height). */
 export async function setPASpray(paId: string, x: number, y: number): Promise<void> {
+  // Never store a junk location (NaN would read back as "no location").
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return;
   await db
     .update(plateAppearances)
     .set({ sprayX: x, sprayY: y })

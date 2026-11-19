@@ -22,6 +22,7 @@ import { Text, View } from 'react-native';
 
 import migrations from '../../drizzle/migrations';
 import { db, prepareDatabase } from '@/db/client';
+import { hideBootSplash } from '@/lib/bootSplash';
 import { registerOfflineSupport } from '@/lib/offline';
 import { installWebAlert } from '@/lib/webAlert';
 import { firstSync, startSync, syncEnabled } from '@/sync/client';
@@ -39,6 +40,10 @@ export default function RootLayout() {
   useEffect(() => {
     prepareDatabase(() => setOtherTab(true)).then(() => setDbReady(true), setDbError);
   }, []);
+  // These messages render under the web loading screen; take it away.
+  useEffect(() => {
+    if (dbError || (otherTab && !dbReady)) hideBootSplash();
+  }, [dbError, otherTab, dbReady]);
   if (dbError) return <DatabaseError message={dbError.message} />;
   if (!dbReady && otherTab) {
     return (
@@ -93,8 +98,11 @@ function ReadyLayout() {
   const ready = fontsLoaded && migrated && firstSyncDone;
 
   useEffect(() => {
-    if (ready) void SplashScreen.hideAsync();
-  }, [ready]);
+    if (ready || migrationError) {
+      void SplashScreen.hideAsync();
+      hideBootSplash();
+    }
+  }, [ready, migrationError]);
 
   // Should never happen in the field; if it does, don't fail silently.
   if (migrationError) return <DatabaseError message={migrationError.message} />;

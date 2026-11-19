@@ -1,7 +1,8 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Tabs } from 'expo-router';
 
-import { fonts, palette } from '@/theme/tokens';
+import { useTabScreenOptions } from '@/components/tabBarOptions';
+import { palette } from '@/theme/tokens';
 import { useTheme } from '@/theme/useTheme';
 
 /**
@@ -9,25 +10,10 @@ import { useTheme } from '@/theme/useTheme';
  * text tint in Player Mode) is the at-a-glance cue for which mode you're in.
  */
 export default function SkTabLayout() {
-  const { colors, isDark } = useTheme();
+  const { isDark } = useTheme();
+  const screenOptions = useTabScreenOptions(isDark ? palette.bulb : palette.bulbDeep);
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: isDark ? palette.bulb : palette.bulbDeep,
-        tabBarInactiveTintColor: colors.textSoft,
-        tabBarStyle: {
-          backgroundColor: colors.card,
-          borderTopColor: colors.line,
-        },
-        tabBarLabelStyle: {
-          fontFamily: fonts.displayBold,
-          fontSize: 11,
-          letterSpacing: 0.8,
-          textTransform: 'uppercase',
-        },
-      }}
-    >
+    <Tabs screenOptions={screenOptions}>
       <Tabs.Screen
         name="team"
         options={{

@@ -19,6 +19,7 @@ export const syncEnabled = Platform.OS === 'web';
 
 const EVERY_MS = 2 * 60_000;
 const CHECK_CHANGES_MS = 4_000;
+const FIRST_CYCLE_DELAY_MS = 2_500;
 const REQUEST_TIMEOUT_MS = 20_000;
 
 export type SyncState = 'idle' | 'syncing' | 'offline' | 'error';
@@ -104,7 +105,9 @@ let started = false;
 export function startSync(): void {
   if (!syncEnabled || started) return;
   started = true;
-  void syncNow();
+  // Let the first screen read its data before a sync cycle queues up behind
+  // it in the database worker (every read waits its turn there).
+  setTimeout(() => void syncNow(), FIRST_CYCLE_DELAY_MS);
   setInterval(() => void syncNow(), EVERY_MS);
   // A change a few seconds ago that hasn't gone up yet.
   setInterval(() => {

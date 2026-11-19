@@ -1,11 +1,12 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { BigButton } from '@/components/BigButton';
 import { OutcomeGrid } from '@/components/OutcomeGrid';
 import { Screen } from '@/components/Screen';
+import { Sheet } from '@/components/Sheet';
 import { ScoreboardPanel } from '@/components/ScoreboardPanel';
 import { SkLineScore } from '@/components/sk/SkLineScore';
 import { Body, Display, Eyebrow, Mono } from '@/components/typography';
@@ -328,10 +329,8 @@ function EditSkPAModal({
 }) {
   const { colors } = useTheme();
   return (
-    <Modal visible={pa !== null} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close" />
-      <View style={[styles.sheet, { backgroundColor: colors.bg, borderColor: colors.line }]}>
-        {pa && (
+    <Sheet visible={pa !== null} onClose={onClose}>
+      {pa && (
           <ScrollView contentContainerStyle={{ gap: spacing.l, padding: spacing.l }}>
             <View style={{ alignItems: 'center', gap: spacing.xs }}>
               <Eyebrow>
@@ -358,9 +357,8 @@ function EditSkPAModal({
               }}
             />
           </ScrollView>
-        )}
-      </View>
-    </Modal>
+      )}
+    </Sheet>
   );
 }
 
@@ -406,16 +404,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingVertical: spacing.m,
     paddingHorizontal: spacing.l,
-  },
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-  },
-  sheet: {
-    maxHeight: '82%',
-    borderTopLeftRadius: radius.l,
-    borderTopRightRadius: radius.l,
-    borderWidth: 1,
-    paddingBottom: spacing.l,
   },
 });

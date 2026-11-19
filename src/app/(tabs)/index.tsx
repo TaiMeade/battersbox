@@ -30,6 +30,7 @@ import {
   useSeasonGoals,
   useSeasonPAs,
 } from '@/hooks/useSeasonData';
+import { useIsWide } from '@/hooks/useLayout';
 import { fonts, radius, spacing } from '@/theme/tokens';
 import { useTheme } from '@/theme/useTheme';
 
@@ -73,6 +74,8 @@ export default function Dashboard() {
 function DashboardBody({ season }: { season: Season }) {
   const { colors } = useTheme();
   const router = useRouter();
+  const wide = useIsWide();
+  const ballEmoji = season.sport === 'softball' ? '🥎' : '⚾';
   const games = useSeasonGames(season.id);
   const paRows = useSeasonPAs(season.id);
   const [starting, setStarting] = useState(false);
@@ -97,8 +100,64 @@ function DashboardBody({ season }: { season: Season }) {
     }
   };
 
+  const scoreboard = (
+    <ScoreboardPanel title={season.name}>
+      {/* 2×2 so five-glyph values like 1.000 never wrap on narrow phones. */}
+      <View style={{ gap: spacing.l }}>
+        <ScoreStatRow>
+          <ScoreStat label="AVG" value={formatAvg(line.avg)} size={36} />
+          <ScoreStat label="OBP" value={formatAvg(line.obp)} size={36} />
+        </ScoreStatRow>
+        <ScoreStatRow>
+          <ScoreStat label="SLG" value={formatAvg(line.slg)} size={36} />
+          <ScoreStat label="OPS" value={formatAvg(line.ops)} size={36} />
+        </ScoreStatRow>
+      </View>
+      <View
+        style={{
+          flexDirection: 'row',
+          borderTopWidth: 1,
+          borderTopColor: colors.panelEdge,
+          paddingTop: spacing.m,
+        }}
+      >
+        <MiniStat label="PA" value={line.pa} />
+        <MiniStat label="AB" value={line.ab} />
+        <MiniStat label="H" value={line.h} />
+        <MiniStat label="HR" value={line.hr} />
+        <MiniStat label="BB" value={line.bb} />
+        <MiniStat label="K" value={line.k} />
+      </View>
+    </ScoreboardPanel>
+  );
+  const goals = <GoalsSection season={season} line={line} />;
+  const recentGames =
+    games === undefined ? null : recent.length > 0 ? (
+      <View style={{ gap: spacing.s }}>
+        <Eyebrow>Recent games</Eyebrow>
+        <View style={{ gap: spacing.s }}>
+          {recent.map((game) => (
+            <GameRow key={game.id} game={game} outcomes={byGame.get(game.id) ?? []} />
+          ))}
+        </View>
+      </View>
+    ) : (
+      <EmptyState
+        icon={ballEmoji}
+        title="Play ball"
+        message={`Start a game ${wide ? 'on the left' : 'below'} and tap each at-bat as it happens. Your line builds itself.`}
+      />
+    );
+  const primary = (
+    <BigButton
+      label={openGame ? 'Resume game' : 'Start game'}
+      onPress={() => void onPrimary()}
+      disabled={starting || games === undefined}
+    />
+  );
+
   return (
-    <Screen>
+    <Screen wide={wide}>
       <View
         style={{
           flexDirection: 'row',
@@ -136,73 +195,47 @@ function DashboardBody({ season }: { season: Season }) {
               color={colors.textSoft}
             />
           </Pressable>
-          <Text style={{ fontSize: 24 }}>{season.sport === 'softball' ? '🥎' : '⚾'}</Text>
+          <Text style={{ fontSize: 24 }}>{ballEmoji}</Text>
         </View>
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ gap: spacing.l, paddingBottom: spacing.l }}
-        style={{ flex: 1 }}
-        keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets
-      >
-        <ScoreboardPanel title={season.name}>
-          {/* 2×2 so five-glyph values like 1.000 never wrap on narrow phones. */}
-          <View style={{ gap: spacing.l }}>
-            <ScoreStatRow>
-              <ScoreStat label="AVG" value={formatAvg(line.avg)} size={36} />
-              <ScoreStat label="OBP" value={formatAvg(line.obp)} size={36} />
-            </ScoreStatRow>
-            <ScoreStatRow>
-              <ScoreStat label="SLG" value={formatAvg(line.slg)} size={36} />
-              <ScoreStat label="OPS" value={formatAvg(line.ops)} size={36} />
-            </ScoreStatRow>
+      {wide ? (
+        // Computer / tablet: the season line, goals, and start button on the
+        // left; the game list on the right.
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            flexDirection: 'row',
+            alignItems: 'flex-start',
+            gap: spacing.xl,
+            paddingBottom: spacing.xl,
+          }}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={{ flex: 1, gap: spacing.l }}>
+            {scoreboard}
+            {goals}
+            {primary}
           </View>
-          <View
-            style={{
-              flexDirection: 'row',
-              borderTopWidth: 1,
-              borderTopColor: colors.panelEdge,
-              paddingTop: spacing.m,
-            }}
+          <View style={{ flex: 1, gap: spacing.l }}>{recentGames}</View>
+        </ScrollView>
+      ) : (
+        <>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ gap: spacing.l, paddingBottom: spacing.l }}
+            style={{ flex: 1 }}
+            keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets
           >
-            <MiniStat label="PA" value={line.pa} />
-            <MiniStat label="AB" value={line.ab} />
-            <MiniStat label="H" value={line.h} />
-            <MiniStat label="HR" value={line.hr} />
-            <MiniStat label="BB" value={line.bb} />
-            <MiniStat label="K" value={line.k} />
-          </View>
-        </ScoreboardPanel>
-
-        <GoalsSection season={season} line={line} />
-
-        {games === undefined ? null : recent.length > 0 ? (
-          <View style={{ gap: spacing.s }}>
-            <Eyebrow>Recent games</Eyebrow>
-            <View style={{ gap: spacing.s }}>
-              {recent.map((game) => (
-                <GameRow key={game.id} game={game} outcomes={byGame.get(game.id) ?? []} />
-              ))}
-            </View>
-          </View>
-        ) : (
-          <EmptyState
-            icon="⚾"
-            title="Play ball"
-            message="Start a game below and tap each at-bat as it happens. Your line builds itself."
-          />
-        )}
-      </ScrollView>
-
-      <View style={{ paddingBottom: spacing.l }}>
-        <BigButton
-          label={openGame ? 'Resume game' : 'Start game'}
-          onPress={() => void onPrimary()}
-          disabled={starting || games === undefined}
-        />
-      </View>
+            {scoreboard}
+            {goals}
+            {recentGames}
+          </ScrollView>
+          <View style={{ paddingBottom: spacing.l }}>{primary}</View>
+        </>
+      )}
     </Screen>
   );
 }

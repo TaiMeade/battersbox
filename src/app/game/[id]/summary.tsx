@@ -5,7 +5,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
 import {
   Alert,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,6 +15,7 @@ import {
 import { BigButton } from '@/components/BigButton';
 import { OutcomeGrid } from '@/components/OutcomeGrid';
 import { Screen } from '@/components/Screen';
+import { Sheet } from '@/components/Sheet';
 import { ScoreboardPanel, ScoreStat, ScoreStatRow } from '@/components/ScoreboardPanel';
 import { GameShareCard } from '@/components/share/ShareCards';
 import { Body, Display, Eyebrow, Mono } from '@/components/typography';
@@ -224,10 +224,8 @@ function PARow({
 function EditPAModal({ pa, onClose }: { pa: PlateAppearance | null; onClose: () => void }) {
   const { colors } = useTheme();
   return (
-    <Modal visible={pa !== null} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close" />
-      <View style={[styles.sheet, { backgroundColor: colors.bg, borderColor: colors.line }]}>
-        {pa && (
+    <Sheet visible={pa !== null} onClose={onClose}>
+      {pa && (
           <ScrollView contentContainerStyle={{ gap: spacing.l, padding: spacing.l }}>
             <View style={{ alignItems: 'center', gap: spacing.xs }}>
               <Eyebrow>At-bat #{pa.seq}</Eyebrow>
@@ -252,9 +250,8 @@ function EditPAModal({ pa, onClose }: { pa: PlateAppearance | null; onClose: () 
               }}
             />
           </ScrollView>
-        )}
-      </View>
-    </Modal>
+      )}
+    </Sheet>
   );
 }
 
@@ -274,21 +271,10 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.m,
     paddingHorizontal: spacing.l,
   },
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-  },
   shot: {
     position: 'absolute',
     top: 0,
     left: -9999,
     width: 330,
-  },
-  sheet: {
-    maxHeight: '82%',
-    borderTopLeftRadius: radius.l,
-    borderTopRightRadius: radius.l,
-    borderWidth: 1,
-    paddingBottom: spacing.l,
   },
 });

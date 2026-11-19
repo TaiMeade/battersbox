@@ -67,6 +67,12 @@ server on `tai-server` whenever it can reach it.
   (last change wins). The phone build doesn't sync.
 - **HTTPS is required** for the offline copy and the browser database, so it's
   served through Tailscale: `https://tai-server.tail09d320.ts.net:8444`.
+- **Updates land one launch later:** the app opens instantly from its saved
+  copy; a new build downloads in the background and is used the next time
+  it's opened.
+- **Phone and computer layouts:** at 900 px wide and up the tabs become a left
+  sidebar and the dashboard, live game, and trends split into two columns
+  (`src/hooks/useLayout.ts`).
 - **One tab at a time:** the browser's storage lets one page hold the
   database; a second tab waits until the first is closed.
 - **Moving data from the phone build:** Settings → Back up everything there,

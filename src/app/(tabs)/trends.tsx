@@ -27,6 +27,7 @@ import {
   useSeasonPAs,
   useSeasons,
 } from '@/hooks/useSeasonData';
+import { useIsWide } from '@/hooks/useLayout';
 import { shareViewImage } from '@/lib/shareImage';
 import { radius, spacing } from '@/theme/tokens';
 import { useTheme } from '@/theme/useTheme';
@@ -37,6 +38,7 @@ export default function Trends() {
   const { colors } = useTheme();
   const { season } = useActiveSeason();
   const [scope, setScope] = useState<Scope>('season');
+  const wide = useIsWide();
 
   const seasonPARows = useSeasonPAs(season?.id);
   const seasonGames = useSeasonGames(season?.id);
@@ -118,8 +120,193 @@ export default function Trends() {
     });
   };
 
+  const lineSection = (
+    <ScoreboardPanel
+      title={scope === 'season' ? 'Season to date' : 'Career'}
+      right={
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Share this line as an image"
+          onPress={onShare}
+          hitSlop={8}
+        >
+          <MaterialCommunityIcons
+            name="share-variant"
+            size={18}
+            color={colors.panelTextSoft}
+          />
+        </Pressable>
+      }
+    >
+      <ScoreStatRow>
+        <ScoreStat label="AVG" value={formatAvg(line.avg)} size={24} />
+        <ScoreStat label="OBP" value={formatAvg(line.obp)} size={24} />
+        <ScoreStat label="SLG" value={formatAvg(line.slg)} size={24} />
+        <ScoreStat label="OPS" value={formatAvg(line.ops)} size={24} />
+      </ScoreStatRow>
+      <View
+        style={{
+          flexDirection: 'row',
+          justifyContent: 'center',
+          gap: spacing.xl,
+          borderTopWidth: 1,
+          borderTopColor: colors.panelEdge,
+          paddingTop: spacing.m,
+        }}
+      >
+        <Body size={13} color={colors.panelTextSoft}>
+          {line.pa} PA · {line.h} H in {line.ab} AB
+        </Body>
+        <Body size={13} color={colors.panelTextSoft}>
+          K {formatRate(line.kRate)} · BB {formatRate(line.bbRate)}
+        </Body>
+      </View>
+    </ScoreboardPanel>
+  );
+  const moreStats = (
+    <View style={{ gap: spacing.m }}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded: nerdOpen }}
+        accessibilityLabel="More stats"
+        onPress={toggleNerd}
+        hitSlop={8}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}
+      >
+        <Eyebrow>More stats</Eyebrow>
+        <MaterialCommunityIcons
+          name={nerdOpen ? 'chevron-up' : 'chevron-down'}
+          size={16}
+          color={colors.textSoft}
+        />
+      </Pressable>
+      {nerdOpen && (
+        <View
+          style={{
+            borderWidth: 1,
+            borderColor: colors.line,
+            borderRadius: radius.m,
+            backgroundColor: colors.card,
+          }}
+        >
+          <NerdRow
+            label="wOBA"
+            sub="Every way on base, weighted by its run value"
+            value={formatAvg(line.woba)}
+          />
+          <NerdRow
+            label="ISO"
+            sub="Isolated power — extra bases per at-bat"
+            value={formatAvg(line.iso)}
+          />
+          <NerdRow
+            label="BABIP"
+            sub="Batting average when the ball lands in play"
+            value={formatAvg(line.babip)}
+          />
+          <NerdRow
+            label="K%"
+            sub="Trips that end in a strikeout"
+            value={formatRate(line.kRate)}
+          />
+          <NerdRow
+            label="BB%"
+            sub="Trips that end in a walk"
+            value={formatRate(line.bbRate)}
+            last
+          />
+        </View>
+      )}
+    </View>
+  );
+  const trendSection = scope === 'season' && (
+    <View style={{ gap: spacing.m }}>
+      <Eyebrow>Season trend</Eyebrow>
+      {trendPoints.length >= 2 ? (
+        <>
+          {compareOptions.length > 0 && (
+            <Chips
+              options={[
+                { key: 'off', label: 'No compare' },
+                ...compareOptions.map((s) => ({ key: s.id, label: `vs ${s.name}` })),
+              ]}
+              value={compareSeason?.id ?? 'off'}
+              onChange={(key) => setCompareId(key === 'off' ? null : key)}
+            />
+          )}
+          <TrendChart
+            points={trendPoints}
+            label={season?.name}
+            compare={
+              compareSeason && comparePoints.length >= 2
+                ? { points: comparePoints, label: compareSeason.name }
+                : undefined
+            }
+          />
+          {compareSeason && comparePoints.length < 2 && (
+            <Body size={13} color={colors.textSoft}>
+              {compareSeason.name} needs at-bats in two games before its line can be
+              drawn.
+            </Body>
+          )}
+        </>
+      ) : (
+        <Body color={colors.textSoft}>
+          Log at-bats in two games and your cumulative AVG and OPS lines start here.
+        </Body>
+      )}
+    </View>
+  );
+  const mixSection = (
+    <View style={{ gap: spacing.m }}>
+      <Eyebrow>Outcome mix</Eyebrow>
+      <OutcomeMixBars line={line} />
+    </View>
+  );
+  const spraySection = scope === 'season' && ballsInPlay > 0 && (
+    <View style={{ gap: spacing.m }}>
+      <Eyebrow>Spray chart</Eyebrow>
+      <SprayField points={sprayPoints} />
+      <SprayLegend points={sprayPoints} />
+      {sprayPoints.length < ballsInPlay && (
+        <Body size={13} color={colors.textSoft}>
+          {sprayPoints.length} of {ballsInPlay} balls in play have a location — tap the
+          field when you log one to fill this in.
+        </Body>
+      )}
+    </View>
+  );
+  const recordsSection = scope === 'season' && seasonGameOutcomes.length > 0 && (
+    <View style={{ gap: spacing.m }}>
+      <Eyebrow>Season records</Eyebrow>
+      <View
+        style={{
+          borderWidth: 1,
+          borderColor: colors.line,
+          borderRadius: radius.m,
+          backgroundColor: colors.card,
+        }}
+      >
+        <RecordRow
+          label="Longest hit streak"
+          value={streakValue(records.longestHitStreak, records.hitStreakLive)}
+        />
+        <RecordRow
+          label="Longest on-base streak"
+          value={streakValue(records.longestOnBaseStreak, records.onBaseStreakLive)}
+        />
+        <RecordRow label="Most hits in a game" value={String(records.mostHitsInGame)} />
+        <RecordRow
+          label="Most total bases in a game"
+          value={String(records.mostTotalBasesInGame)}
+          last
+        />
+      </View>
+    </View>
+  );
+
   return (
-    <Screen>
+    <Screen wide={wide}>
       <View style={{ paddingVertical: spacing.s, gap: spacing.m }}>
         <Display size={32}>Trends</Display>
         <Chips<Scope>
@@ -141,190 +328,36 @@ export default function Trends() {
       ) : (
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ gap: spacing.xl, paddingBottom: spacing.xxl }}
+          contentContainerStyle={
+            wide
+              ? { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xl, paddingBottom: spacing.xxl }
+              : { gap: spacing.xl, paddingBottom: spacing.xxl }
+          }
         >
-          <ScoreboardPanel
-            title={scope === 'season' ? 'Season to date' : 'Career'}
-            right={
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Share this line as an image"
-                onPress={onShare}
-                hitSlop={8}
-              >
-                <MaterialCommunityIcons
-                  name="share-variant"
-                  size={18}
-                  color={colors.panelTextSoft}
-                />
-              </Pressable>
-            }
-          >
-            <ScoreStatRow>
-              <ScoreStat label="AVG" value={formatAvg(line.avg)} size={24} />
-              <ScoreStat label="OBP" value={formatAvg(line.obp)} size={24} />
-              <ScoreStat label="SLG" value={formatAvg(line.slg)} size={24} />
-              <ScoreStat label="OPS" value={formatAvg(line.ops)} size={24} />
-            </ScoreStatRow>
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'center',
-                gap: spacing.xl,
-                borderTopWidth: 1,
-                borderTopColor: colors.panelEdge,
-                paddingTop: spacing.m,
-              }}
-            >
-              <Body size={13} color={colors.panelTextSoft}>
-                {line.pa} PA · {line.h} H in {line.ab} AB
-              </Body>
-              <Body size={13} color={colors.panelTextSoft}>
-                K {formatRate(line.kRate)} · BB {formatRate(line.bbRate)}
-              </Body>
-            </View>
-          </ScoreboardPanel>
-
-          <View style={{ gap: spacing.m }}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ expanded: nerdOpen }}
-              accessibilityLabel="More stats"
-              onPress={toggleNerd}
-              hitSlop={8}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}
-            >
-              <Eyebrow>More stats</Eyebrow>
-              <MaterialCommunityIcons
-                name={nerdOpen ? 'chevron-up' : 'chevron-down'}
-                size={16}
-                color={colors.textSoft}
-              />
-            </Pressable>
-            {nerdOpen && (
-              <View
-                style={{
-                  borderWidth: 1,
-                  borderColor: colors.line,
-                  borderRadius: radius.m,
-                  backgroundColor: colors.card,
-                }}
-              >
-                <NerdRow
-                  label="wOBA"
-                  sub="Every way on base, weighted by its run value"
-                  value={formatAvg(line.woba)}
-                />
-                <NerdRow
-                  label="ISO"
-                  sub="Isolated power — extra bases per at-bat"
-                  value={formatAvg(line.iso)}
-                />
-                <NerdRow
-                  label="BABIP"
-                  sub="Batting average when the ball lands in play"
-                  value={formatAvg(line.babip)}
-                />
-                <NerdRow
-                  label="K%"
-                  sub="Trips that end in a strikeout"
-                  value={formatRate(line.kRate)}
-                />
-                <NerdRow
-                  label="BB%"
-                  sub="Trips that end in a walk"
-                  value={formatRate(line.bbRate)}
-                  last
-                />
+          {wide ? (
+            // Computer / tablet: the line and its trend on the left, the
+            // breakdowns on the right.
+            <>
+              <View style={{ flex: 1, gap: spacing.xl }}>
+                {lineSection}
+                {moreStats}
+                {trendSection}
               </View>
-            )}
-          </View>
-
-          {scope === 'season' && (
-            <View style={{ gap: spacing.m }}>
-              <Eyebrow>Season trend</Eyebrow>
-              {trendPoints.length >= 2 ? (
-                <>
-                  {compareOptions.length > 0 && (
-                    <Chips
-                      options={[
-                        { key: 'off', label: 'No compare' },
-                        ...compareOptions.map((s) => ({ key: s.id, label: `vs ${s.name}` })),
-                      ]}
-                      value={compareSeason?.id ?? 'off'}
-                      onChange={(key) => setCompareId(key === 'off' ? null : key)}
-                    />
-                  )}
-                  <TrendChart
-                    points={trendPoints}
-                    label={season?.name}
-                    compare={
-                      compareSeason && comparePoints.length >= 2
-                        ? { points: comparePoints, label: compareSeason.name }
-                        : undefined
-                    }
-                  />
-                  {compareSeason && comparePoints.length < 2 && (
-                    <Body size={13} color={colors.textSoft}>
-                      {compareSeason.name} needs at-bats in two games before its line can be
-                      drawn.
-                    </Body>
-                  )}
-                </>
-              ) : (
-                <Body color={colors.textSoft}>
-                  Log at-bats in two games and your cumulative AVG and OPS lines start here.
-                </Body>
-              )}
-            </View>
-          )}
-
-          <View style={{ gap: spacing.m }}>
-            <Eyebrow>Outcome mix</Eyebrow>
-            <OutcomeMixBars line={line} />
-          </View>
-
-          {scope === 'season' && sprayPoints.length > 0 && (
-            <View style={{ gap: spacing.m }}>
-              <Eyebrow>Spray chart</Eyebrow>
-              <SprayField points={sprayPoints} />
-              <SprayLegend points={sprayPoints} />
-              {sprayPoints.length < ballsInPlay && (
-                <Body size={13} color={colors.textSoft}>
-                  {sprayPoints.length} of {ballsInPlay} balls in play have a location — tap the
-                  field when you log one to fill this in.
-                </Body>
-              )}
-            </View>
-          )}
-
-          {scope === 'season' && seasonGameOutcomes.length > 0 && (
-            <View style={{ gap: spacing.m }}>
-              <Eyebrow>Season records</Eyebrow>
-              <View
-                style={{
-                  borderWidth: 1,
-                  borderColor: colors.line,
-                  borderRadius: radius.m,
-                  backgroundColor: colors.card,
-                }}
-              >
-                <RecordRow
-                  label="Longest hit streak"
-                  value={streakValue(records.longestHitStreak, records.hitStreakLive)}
-                />
-                <RecordRow
-                  label="Longest on-base streak"
-                  value={streakValue(records.longestOnBaseStreak, records.onBaseStreakLive)}
-                />
-                <RecordRow label="Most hits in a game" value={String(records.mostHitsInGame)} />
-                <RecordRow
-                  label="Most total bases in a game"
-                  value={String(records.mostTotalBasesInGame)}
-                  last
-                />
+              <View style={{ flex: 1, gap: spacing.xl }}>
+                {mixSection}
+                {spraySection}
+                {recordsSection}
               </View>
-            </View>
+            </>
+          ) : (
+            <>
+              {lineSection}
+              {moreStats}
+              {trendSection}
+              {mixSection}
+              {spraySection}
+              {recordsSection}
+            </>
           )}
         </ScrollView>
       )}

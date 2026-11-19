@@ -1,29 +1,14 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Tabs } from 'expo-router';
 
-import { fonts } from '@/theme/tokens';
+import { useTabScreenOptions } from '@/components/tabBarOptions';
 import { useTheme } from '@/theme/useTheme';
 
 export default function TabLayout() {
   const { colors } = useTheme();
+  const screenOptions = useTabScreenOptions(colors.text);
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: colors.text,
-        tabBarInactiveTintColor: colors.textSoft,
-        tabBarStyle: {
-          backgroundColor: colors.card,
-          borderTopColor: colors.line,
-        },
-        tabBarLabelStyle: {
-          fontFamily: fonts.displayBold,
-          fontSize: 11,
-          letterSpacing: 0.8,
-          textTransform: 'uppercase',
-        },
-      }}
-    >
+    <Tabs screenOptions={screenOptions}>
       <Tabs.Screen
         name="index"
         options={{

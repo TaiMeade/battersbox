@@ -167,6 +167,10 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: spacing.xl,
     gap: spacing.xl,
+    // One readable column on a computer instead of edge-to-edge fields.
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
   },
   title: {
     fontFamily: fonts.displayBold,

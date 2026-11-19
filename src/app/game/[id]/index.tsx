@@ -19,10 +19,11 @@ import { Body, Eyebrow, Mono } from '@/components/typography';
 import { UndoSnackbar } from '@/components/UndoSnackbar';
 import { db } from '@/db/client';
 import { endGame, logPA, setGameOpponent, setPASpray, undoPA } from '@/db/repo';
-import { games, plateAppearances } from '@/db/schema';
+import { games, plateAppearances, type Game } from '@/db/schema';
 import type { Milestone } from '@/domain/milestones';
 import { OUTCOME_SPECS, isOutcomeCode, type OutcomeCode } from '@/domain/outcomes';
 import { gameLine } from '@/domain/stats';
+import { useIsWide } from '@/hooks/useLayout';
 import { milestoneAfterPA } from '@/lib/checkMilestones';
 import { formatDate } from '@/lib/format';
 import { useUndoStore } from '@/store/undo';
@@ -39,6 +40,7 @@ export default function LiveGame() {
   const router = useRouter();
   const showUndo = useUndoStore((s) => s.show);
   const clearUndo = useUndoStore((s) => s.clear);
+  const wide = useIsWide();
 
   const { data: gameRows, updatedAt: gameReadAt } = useLiveQuery(
     db.select().from(games).where(eq(games.id, id ?? '')),
@@ -119,8 +121,14 @@ export default function LiveGame() {
     router.replace({ pathname: '/game/[id]/summary', params: { id: game.id } });
   };
 
+  const scoreboard = <LiveScoreboard game={game} outcomes={outcomes} />;
+  const grid = <OutcomeGrid onSelect={(code) => void onOutcome(code)} />;
+  const endButton = (
+    <BigButton label="End game" variant="secondary" onPress={() => void onEndGame()} />
+  );
+
   return (
-    <Screen>
+    <Screen wide={wide}>
       <View style={styles.header}>
         <Pressable
           accessibilityRole="button"
@@ -142,49 +150,34 @@ export default function LiveGame() {
         <View style={{ width: 32 }} />
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ gap: spacing.l, paddingBottom: spacing.l }}
-        style={{ flex: 1 }}
-      >
-        <ScoreboardPanel
-          title={formatDate(game.playedOn)}
-          right={
-            <Eyebrow size={11} color={colors.accent}>
-              {outcomes.length} PA
-            </Eyebrow>
-          }
-        >
-          <View style={{ alignItems: 'center', gap: spacing.xs }}>
-            <Eyebrow size={11} color={colors.panelTextSoft}>
-              Today
-            </Eyebrow>
-            <Mono size={26} color={colors.accent}>
-              {outcomes.length > 0 ? gameLine(outcomes) : 'Step in'}
-            </Mono>
+      {wide ? (
+        // Computer / tablet: the game so far on the left, the tiles on the right.
+        <View style={{ flex: 1, flexDirection: 'row', gap: spacing.xl }}>
+          <View style={{ flex: 2, gap: spacing.l, paddingBottom: spacing.l }}>
+            {scoreboard}
+            {endButton}
           </View>
-          {outcomes.length > 0 && (
-            <Pressable
-              accessibilityRole="button"
-              onPress={() =>
-                router.push({ pathname: '/game/[id]/summary', params: { id: game.id } })
-              }
-              hitSlop={8}
-              style={{ alignItems: 'center' }}
-            >
-              <Body size={13} color={colors.panelTextSoft}>
-                Review at-bats →
-              </Body>
-            </Pressable>
-          )}
-        </ScoreboardPanel>
-
-        <OutcomeGrid onSelect={(code) => void onOutcome(code)} />
-      </ScrollView>
-
-      <View style={{ paddingBottom: spacing.l }}>
-        <BigButton label="End game" variant="secondary" onPress={() => void onEndGame()} />
-      </View>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            style={{ flex: 3 }}
+            contentContainerStyle={{ paddingBottom: spacing.l }}
+          >
+            {grid}
+          </ScrollView>
+        </View>
+      ) : (
+        <>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ gap: spacing.l, paddingBottom: spacing.l }}
+            style={{ flex: 1 }}
+          >
+            {scoreboard}
+            {grid}
+          </ScrollView>
+          <View style={{ paddingBottom: spacing.l }}>{endButton}</View>
+        </>
+      )}
 
       <SprayCapture
         outcome={sprayFor?.outcome ?? null}
@@ -196,6 +189,44 @@ export default function LiveGame() {
 
       <MilestoneBanner milestone={celebration} onDismiss={() => setCelebration(null)} />
     </Screen>
+  );
+}
+
+function LiveScoreboard({ game, outcomes }: { game: Game; outcomes: OutcomeCode[] }) {
+  const { colors } = useTheme();
+  const router = useRouter();
+  return (
+    <ScoreboardPanel
+      title={formatDate(game.playedOn)}
+      right={
+        <Eyebrow size={11} color={colors.accent}>
+          {outcomes.length} PA
+        </Eyebrow>
+      }
+    >
+      <View style={{ alignItems: 'center', gap: spacing.xs }}>
+        <Eyebrow size={11} color={colors.panelTextSoft}>
+          Today
+        </Eyebrow>
+        <Mono size={26} color={colors.accent}>
+          {outcomes.length > 0 ? gameLine(outcomes) : 'Step in'}
+        </Mono>
+      </View>
+      {outcomes.length > 0 && (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() =>
+            router.push({ pathname: '/game/[id]/summary', params: { id: game.id } })
+          }
+          hitSlop={8}
+          style={{ alignItems: 'center' }}
+        >
+          <Body size={13} color={colors.panelTextSoft}>
+            Review at-bats →
+          </Body>
+        </Pressable>
+      )}
+    </ScoreboardPanel>
   );
 }
 
