@@ -8,7 +8,7 @@
  *   PORT=3700  HOST=127.0.0.1  DATA_DIR=./data  WEB_DIR=./dist-web
  *   BACKUP_DIR=<DATA_DIR>/backups   BACKUP_AT=03:15 (or "off")
  */
-import { appendFileSync, mkdirSync, renameSync, statSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -52,23 +52,7 @@ if (backupAt !== 'off') {
   if (!newest || newest < `nightly-${yesterday.toISOString().slice(0, 10)}.db`) backup();
 }
 
-// Diagnostics sent by the web app (src/lib/diag.web.ts): one JSON line per
-// batch in DATA_DIR/diag.log, rolled over to diag.log.1 at 2 MB.
-const diagFile = join(dataDir, 'diag.log');
-function writeDiag(batch: unknown) {
-  try {
-    if ((statSync(diagFile, { throwIfNoEntry: false })?.size ?? 0) > 2 * 1024 * 1024) {
-      renameSync(diagFile, `${diagFile}.1`);
-    }
-    appendFileSync(diagFile, JSON.stringify({ at: new Date().toISOString(), ...(batch as object) }) + '\n', { mode: 0o600 });
-  } catch (err) {
-    console.error(`[battersbox] diag log failed: ${(err as Error).message}`);
-  }
-}
-
-const server = createServer(
-  createApp({ store, webDir, status: () => ({ backup: lastBackup }), diag: writeDiag }),
-);
+const server = createServer(createApp({ store, webDir, status: () => ({ backup: lastBackup }) }));
 server.listen(port, host, () => console.info(`[battersbox] listening on http://${host}:${port}, web app from ${webDir}`));
 
 for (const signal of ['SIGTERM', 'SIGINT'] as const) {

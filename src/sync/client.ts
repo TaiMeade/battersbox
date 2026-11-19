@@ -11,7 +11,6 @@ import { Platform } from 'react-native';
 import { create } from 'zustand';
 
 import { rawDb } from '@/db/client';
-import { diag } from '@/lib/diag';
 
 import { deviceId, hasSynced, pendingCount, syncOnce, type Sql, type Transport } from './engine';
 import type { PullResponse, PushResponse } from './tables';
@@ -75,17 +74,13 @@ export function syncNow(): Promise<void> {
   if (!syncEnabled) return Promise.resolve();
   running ??= (async () => {
     useSyncStatus.setState({ state: 'syncing' });
-    const started = Date.now();
-    diag('syncStart');
     try {
       device ??= await deviceId(sql, randomUUID);
-      const { pushed, pulled } = await syncOnce(sql, transport, device);
+      await syncOnce(sql, transport, device);
       useSyncStatus.setState({ state: 'idle', lastSyncedAt: Date.now(), message: null });
-      diag('syncEnd', { ms: Date.now() - started, pushed, pulled });
     } catch (err) {
       const offline = err instanceof Offline;
       useSyncStatus.setState({ state: offline ? 'offline' : 'error', message: (err as Error).message });
-      diag('syncEnd', { ms: Date.now() - started, failed: (err as Error).message });
     } finally {
       useSyncStatus.setState({ pending: await pendingCount(sql).catch(() => 0) });
       running = null;

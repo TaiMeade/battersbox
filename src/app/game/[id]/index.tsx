@@ -25,7 +25,6 @@ import { OUTCOME_SPECS, isOutcomeCode, type OutcomeCode } from '@/domain/outcome
 import { gameLine } from '@/domain/stats';
 import { useIsWide } from '@/hooks/useLayout';
 import { milestoneAfterPA } from '@/lib/checkMilestones';
-import { diag, diagAction } from '@/lib/diag';
 import { formatDate } from '@/lib/format';
 import { useUndoStore } from '@/store/undo';
 import { fonts, spacing } from '@/theme/tokens';
@@ -86,12 +85,9 @@ export default function LiveGame() {
   if (!game) return <Screen>{null}</Screen>;
 
   const onOutcome = async (code: OutcomeCode) => {
-    diagAction(`tap ${code}`);
-    const t0 = Date.now();
     const pa = await logPA(game.id, code);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const milestone = await milestoneAfterPA(game.seasonId, game.id);
-    diag('logged', { code, ms: Date.now() - t0 });
     if (OUTCOME_SPECS[code].inPlay) {
       // Ball in play — offer the optional spray-chart tap. The undo toast
       // waits until this closes so its 4s window isn't spent aiming.
@@ -105,7 +101,6 @@ export default function LiveGame() {
 
   const finishSpray = (place?: { x: number; y: number }) => {
     if (!sprayFor) return;
-    diagAction(place ? 'spray placed' : 'spray skipped');
     if (place) void setPASpray(sprayFor.paId, place.x, place.y);
     const sprayPaId = sprayFor.paId;
     showUndo({
