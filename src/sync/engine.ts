@@ -146,8 +146,11 @@ export async function syncOnce(sql: Sql, transport: Transport, device: string): 
   for (;;) {
     const { changes, pending } = await collectChanges(sql);
     if (!pending.length) break;
-    await transport.push({ device, changes });
+    const result = await transport.push({ device, changes });
     await acknowledge(sql, pending);
+    // Rows where another device's newer change won: take the server's version,
+    // since the cursor has usually moved past it already.
+    if (result?.winners?.length) await applyChanges(sql, result.winners);
     pushed += changes.length;
     if (pending.length < BATCH) break;
   }
@@ -162,6 +165,17 @@ export async function syncOnce(sql: Sql, transport: Transport, device: string): 
     if (!page.more) break;
   }
   return { pushed, pulled };
+}
+
+/**
+ * Pull everything again on the next cycle, once per `tag`. Repairs a device
+ * that kept a losing copy of a row before the server sent winners back
+ * (2026-11-20). Rows with a change still waiting to go up keep their value.
+ */
+export async function repullOnce(sql: Sql, tag: string): Promise<void> {
+  if ((await getState(sql, 'repull')) === tag) return;
+  if ((await getState(sql, 'cursor')) !== null) await setState(sql, 'cursor', '0');
+  await setState(sql, 'repull', tag);
 }
 
 /** True once this device has pulled from the server at least once. */

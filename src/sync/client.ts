@@ -12,7 +12,7 @@ import { create } from 'zustand';
 
 import { rawDb } from '@/db/client';
 
-import { deviceId, hasSynced, pendingCount, syncOnce, type Sql, type Transport } from './engine';
+import { deviceId, hasSynced, pendingCount, repullOnce, syncOnce, type Sql, type Transport } from './engine';
 import type { PullResponse, PushResponse } from './tables';
 
 export const syncEnabled = Platform.OS === 'web';
@@ -76,6 +76,7 @@ export function syncNow(): Promise<void> {
     useSyncStatus.setState({ state: 'syncing' });
     try {
       device ??= await deviceId(sql, randomUUID);
+      await repullOnce(sql, 'winners-2026-11-20');
       await syncOnce(sql, transport, device);
       useSyncStatus.setState({ state: 'idle', lastSyncedAt: Date.now(), message: null });
     } catch (err) {

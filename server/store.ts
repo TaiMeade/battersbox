@@ -65,20 +65,22 @@ export class SyncStore {
       if (c.row && JSON.stringify(c.row).length > MAX_ROW_BYTES) throw new BadRequest(`row ${c.tbl}/${c.key} is too large`);
     }
 
-    const current = this.db.prepare('SELECT changed_at AS changedAt, device FROM rows WHERE tbl = ? AND row_key = ?');
+    const current = this.db.prepare('SELECT data, changed_at AS changedAt, device FROM rows WHERE tbl = ? AND row_key = ?');
     const write = this.db.prepare(`INSERT INTO rows (tbl, row_key, data, changed_at, device, seq) VALUES (?, ?, ?, ?, ?, ?)
       ON CONFLICT(tbl, row_key) DO UPDATE SET data = excluded.data, changed_at = excluded.changed_at,
         device = excluded.device, seq = excluded.seq`);
     let accepted = 0;
     let stale = 0;
+    const winners: SyncChange[] = [];
     this.db.exec('BEGIN IMMEDIATE');
     try {
       let seq = Number((this.db.prepare('SELECT COALESCE(MAX(seq), 0) AS s FROM rows').get() as { s: number }).s);
       for (const c of changes) {
-        const have = current.get(c.tbl, c.key) as { changedAt: number; device: string } | undefined;
+        const have = current.get(c.tbl, c.key) as { data: string | null; changedAt: number; device: string } | undefined;
         // Newer wins; a tie goes to the larger device id, so every server decides the same way.
         if (have && (have.changedAt > c.changedAt || (have.changedAt === c.changedAt && have.device > r.device))) {
           stale++;
+          winners.push({ tbl: c.tbl, key: c.key, changedAt: have.changedAt, row: have.data === null ? null : (JSON.parse(have.data) as Record<string, unknown>) });
           continue;
         }
         write.run(c.tbl, c.key, c.row === null ? null : JSON.stringify(c.row), c.changedAt, r.device, ++seq);
@@ -90,7 +92,7 @@ export class SyncStore {
       this.db.exec('ROLLBACK');
       throw err;
     }
-    return { accepted, stale };
+    return winners.length ? { accepted, stale, winners } : { accepted, stale };
   }
 
   pull(cursor: number, limit = BATCH): PullResponse {

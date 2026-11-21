@@ -41,10 +41,14 @@ function backup() {
 
 if (backupAt !== 'off') {
   const [h, m] = backupAt.split(':').map(Number);
-  const schedule = () => setTimeout(() => {
-    backup();
-    schedule();
-  }, msUntil(h!, m!)).unref();
+  const schedule = () => {
+    // A Node timer (the app's DOM types think setTimeout returns a number).
+    const timer = setTimeout(() => {
+      backup();
+      schedule();
+    }, msUntil(h!, m!)) as unknown as { unref(): void };
+    timer.unref();
+  };
   schedule();
   // Missed last night's (server was off)? Do one now.
   const newest = listBackups(backupDir)[0];

@@ -4,7 +4,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { beforeEach, describe, expect, test } from 'vitest';
 
 import { SyncStore } from '../../server/store';
-import { applyChanges, collectChanges, deviceId, hasSynced, pendingCount, syncOnce, type Sql, type Transport } from './engine';
+import { applyChanges, collectChanges, deviceId, hasSynced, pendingCount, repullOnce, syncOnce, type Sql, type Transport } from './engine';
 
 /** A device: Node's SQLite with every app migration applied, behind the engine's Sql interface. */
 function device(name: string) {
@@ -138,6 +138,44 @@ describe('syncOnce', () => {
     const old = server.pull(0).changes.filter((c) => c.key === 'pa1');
     await applyChanges(phone.sql, old);
     expect((phone.db.prepare("SELECT outcome FROM plate_appearances WHERE id = 'pa1'").get() as { outcome: string }).outcome).toBe('HR');
+  });
+
+  test('a change that loses on the server is replaced by the winner, even after pulling past it', async () => {
+    const phone = device('phone');
+    const laptop = device('laptop');
+    seedSeason(phone);
+    logPA(phone, 'pa1', '1B', 1);
+    await syncOnce(phone.sql, transportTo(server), 'phone');
+    await syncOnce(laptop.sql, transportTo(server), 'laptop');
+
+    // The phone edits the at-bat but its push hasn't gone yet; the laptop's later edit reaches the server first.
+    phone.db.prepare("UPDATE plate_appearances SET outcome = 'K' WHERE id = 'pa1'").run();
+    laptop.db.prepare("UPDATE plate_appearances SET outcome = '2B' WHERE id = 'pa1'").run();
+    laptop.db.prepare("UPDATE sync_changes SET changed_at = changed_at + 60000 WHERE row_key = 'pa1'").run();
+    await syncOnce(laptop.sql, transportTo(server), 'laptop');
+    // The phone pulls past the laptop's row while its own change is still waiting (so it keeps its K)...
+    const page = server.pull(0);
+    await applyChanges(phone.sql, page.changes);
+    phone.db.prepare("INSERT OR REPLACE INTO sync_state (key, value) VALUES ('cursor', ?)").run(String(page.cursor));
+    // ...then pushes it, loses, and takes the laptop's 2B.
+    await syncOnce(phone.sql, transportTo(server), 'phone');
+    expect((phone.db.prepare("SELECT outcome FROM plate_appearances WHERE id = 'pa1'").get() as { outcome: string }).outcome).toBe('2B');
+    expect(await pendingCount(phone.sql)).toBe(0);
+  });
+
+  test('repullOnce brings a diverged copy back in line, once', async () => {
+    const phone = device('phone');
+    seedSeason(phone);
+    logPA(phone, 'pa1', '1B', 1);
+    await syncOnce(phone.sql, transportTo(server), 'phone');
+    // A copy that went wrong before winners were sent back: no change waiting, value differs from the server.
+    phone.db.prepare("UPDATE plate_appearances SET outcome = 'HR' WHERE id = 'pa1'").run();
+    phone.db.prepare('DELETE FROM sync_changes').run();
+    await repullOnce(phone.sql, 'v1');
+    await syncOnce(phone.sql, transportTo(server), 'phone');
+    expect((phone.db.prepare("SELECT outcome FROM plate_appearances WHERE id = 'pa1'").get() as { outcome: string }).outcome).toBe('1B');
+    await repullOnce(phone.sql, 'v1');
+    expect(await syncOnce(phone.sql, transportTo(server), 'phone')).toEqual({ pushed: 0, pulled: 0 });
   });
 
   test('settings sync by their key, and children may arrive before parents', async () => {

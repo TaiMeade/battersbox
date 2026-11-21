@@ -17,9 +17,10 @@ describe('SyncStore', () => {
   test('newest change wins; a tie goes to the larger device id', () => {
     const store = new SyncStore(new DatabaseSync(':memory:'));
     assert.deepEqual(store.push({ device: 'b', changes: [pa('x', '1B')] }), { accepted: 1, stale: 0 });
-    assert.deepEqual(store.push({ device: 'a', changes: [pa('x', 'K')] }), { accepted: 0, stale: 1 });
+    // A loser gets the winning version back, to replace its own copy.
+    assert.deepEqual(store.push({ device: 'a', changes: [pa('x', 'K')] }), { accepted: 0, stale: 1, winners: [pa('x', '1B')] });
     assert.deepEqual(store.push({ device: 'c', changes: [pa('x', '2B')] }), { accepted: 1, stale: 0 });
-    assert.deepEqual(store.push({ device: 'a', changes: [{ ...pa('x', 'HR'), changedAt: T - 1 }] }), { accepted: 0, stale: 1 });
+    assert.deepEqual(store.push({ device: 'a', changes: [{ ...pa('x', 'HR'), changedAt: T - 1 }] }), { accepted: 0, stale: 1, winners: [pa('x', '2B')] });
     assert.equal(store.pull(0).changes[0]?.row?.outcome, '2B');
   });
 

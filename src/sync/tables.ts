@@ -45,6 +45,12 @@ export interface PushResponse {
   accepted: number;
   /** Changes the server already had something newer for. */
   stale: number;
+  /**
+   * The server's version of each stale row. The device has usually pulled
+   * past it already, so without this its losing copy would never be replaced.
+   * Optional so an older server still works.
+   */
+  winners?: SyncChange[];
 }
 
 export interface PullResponse {
